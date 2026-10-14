@@ -1,0 +1,7 @@
+@import "tailwindcss/preflight.css" layer(base);
+@import "./styles/base.css";
+@import "./styles/board.css";
+@import "./styles/game.css";
+@import "./styles/overlays.css";
+@import "./styles/landing.css";
+@import "./styles/setup.css";
