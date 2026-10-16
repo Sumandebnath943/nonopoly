@@ -733,31 +733,96 @@ const ART = {
   39: Altamount,
 };
 
+// Scenic poster backdrops per tile group/type so every tile looks like a vibrant miniature Indian travel poster
+const TILE_SCENERY = {
+  0: { sky: '#fff2b2', glow: '#ff9f1c', ground: '#ffbe3b' },
+  1: { sky: '#ffe4c4', glow: '#ff8a1f', ground: '#d97b48' },
+  2: { sky: '#d8f8e1', glow: '#2eb844', ground: '#8ae0a0' },
+  3: { sky: '#ffe4c4', glow: '#ff8a1f', ground: '#d97b48' },
+  4: { sky: '#ffd6dd', glow: '#e2323a', ground: '#f294a2' },
+  5: { sky: '#dbeafe', glow: '#3b82f6', ground: '#93c5fd' },
+  6: { sky: '#ffe0f0', glow: '#ff5ca8', ground: '#f7a6c6' },
+  7: { sky: '#ffe0f4', glow: '#e5007d', ground: '#f5a3d0' },
+  8: { sky: '#fff0c2', glow: '#ff9f1c', ground: '#7cc7ff' },
+  9: { sky: '#ffe0f0', glow: '#ff5ca8', ground: '#f7a6c6' },
+  10: { sky: '#ffe5c4', glow: '#ff7a00', ground: '#cfa07a' },
+  11: { sky: '#ffdbf0', glow: '#ee3a8c', ground: '#f49ac2' },
+  12: { sky: '#fff8c4', glow: '#f5c000', ground: '#cbd5e1' },
+  13: { sky: '#ffdbf0', glow: '#ee3a8c', ground: '#f49ac2' },
+  14: { sky: '#fff1c2', glow: '#ff8a1a', ground: '#d8b4e2' },
+  15: { sky: '#fee2e2', glow: '#ef4444', ground: '#94a3b8' },
+  16: { sky: '#fff3b0', glow: '#ff8a1a', ground: '#48cae4' },
+  17: { sky: '#d8f8e1', glow: '#2eb844', ground: '#8ae0a0' },
+  18: { sky: '#ffedd5', glow: '#f97316', ground: '#fcd34d' },
+  19: { sky: '#1e1b4b', glow: '#f59e0b', ground: '#1d4ed8', night: true },
+  20: { sky: '#dcfce7', glow: '#1aa85a', ground: '#86efac' },
+  21: { sky: '#fee2e2', glow: '#e2323a', ground: '#fca5a5' },
+  22: { sky: '#ffe0f4', glow: '#e5007d', ground: '#f5a3d0' },
+  23: { sky: '#fee2e2', glow: '#e2323a', ground: '#fca5a5' },
+  24: { sky: '#e0f2fe', glow: '#0284c7', ground: '#7dd3fc' },
+  25: { sky: '#dbeafe', glow: '#2563eb', ground: '#93c5fd' },
+  26: { sky: '#fef3c7', glow: '#f59e0b', ground: '#fde047' },
+  27: { sky: '#fef3c7', glow: '#f59e0b', ground: '#fde047' },
+  28: { sky: '#e0e7ff', glow: '#4f46e5', ground: '#a5b4fc' },
+  29: { sky: '#e0f2fe', glow: '#0ea5e9', ground: '#fde047' },
+  30: { sky: '#fecdd3', glow: '#e11d48', ground: '#fb7185' },
+  31: { sky: '#d1fae5', glow: '#10b981', ground: '#38bdf8' },
+  32: { sky: '#ffedd5', glow: '#f97316', ground: '#38bdf8' },
+  33: { sky: '#d8f8e1', glow: '#2eb844', ground: '#8ae0a0' },
+  34: { sky: '#172554', glow: '#fbbf24', ground: '#1e40af', night: true },
+  35: { sky: '#dcfce7', glow: '#16a34a', ground: '#86efac' },
+  36: { sky: '#ffe0f4', glow: '#e5007d', ground: '#f5a3d0' },
+  37: { sky: '#e0e7ff', glow: '#4338ca', ground: '#818cf8' },
+  38: { sky: '#ffe4e6', glow: '#e11d48', ground: '#fda4af' },
+  39: { sky: '#1e1b4b', glow: '#ffd34d', ground: '#312e81', night: true },
+};
+
 export function TileArt({ id, className, title }) {
   const Art = ART[id];
   if (!Art) return null;
+  const sc = TILE_SCENERY[id];
   return (
     <Svg className={className} title={title}>
+      {sc && (
+        <g aria-hidden="true">
+          <rect x="2" y="2" width="60" height="60" rx="12" fill={sc.sky} />
+          <circle cx="32" cy="26" r="21" fill={sc.glow} opacity={sc.night ? '0.28' : '0.32'} />
+          <path d="M2 46 Q32 40 62 46 V52 Q62 62 52 62 H12 Q2 62 2 52Z" fill={sc.ground} opacity="0.55" />
+          {sc.night && (
+            <g fill="#fff9c4">
+              <circle cx="12" cy="12" r="1.3" />
+              <circle cx="24" cy="8" r="1.1" />
+              <circle cx="50" cy="11" r="1.4" />
+              <circle cx="40" cy="14" r="0.9" />
+            </g>
+          )}
+          <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="rgba(42,20,8,0.18)" strokeWidth="1.5" />
+        </g>
+      )}
       <Art />
     </Svg>
   );
 }
 
-// Tiny building markers for the colour band.
+// Detailed 3D miniature building markers for the colour band & Empire cards.
 export function BuildingIcon({ haveli = false, className }) {
   if (haveli) {
     return (
-      <svg viewBox="0 0 24 20" className={className} aria-hidden="true">
-        <path d="M2 19 V9 H6 V6 Q12 0 18 6 V9 H22 V19Z" fill="#ffd34d" stroke={K} strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M10 19 V14 Q12 11.5 14 14 V19" fill="#c9553a" stroke={K} strokeWidth="1.2" />
-        <circle cx="12" cy="3" r="1.4" fill="#ffd34d" stroke={K} strokeWidth="1" />
+      <svg viewBox="0 0 28 22" className={className} aria-hidden="true">
+        <path d="M2 20 V10 H6 V7 Q14 0 22 7 V10 H26 V20Z" fill="#ffd34d" stroke={K} strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M6 10 H22" stroke="#b87300" strokeWidth="1.2" />
+        <path d="M11 20 V14 Q14 11 17 14 V20Z" fill="#c91838" stroke={K} strokeWidth="1.2" />
+        <circle cx="7.5" cy="14.5" r="1.5" fill="#fff6b8" stroke={K} strokeWidth="0.9" />
+        <circle cx="20.5" cy="14.5" r="1.5" fill="#fff6b8" stroke={K} strokeWidth="0.9" />
+        <circle cx="14" cy="2.3" r="1.6" fill="#ff2e88" stroke={K} strokeWidth="1" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 16 16" className={className} aria-hidden="true">
-      <path d="M2 15 V7 L8 2 L14 7 V15Z" fill="#fffaf0" stroke={K} strokeWidth="1.6" strokeLinejoin="round" />
-      <rect x="6.5" y="10" width="3" height="5" fill="#3aa02e" />
+    <svg viewBox="0 0 18 18" className={className} aria-hidden="true">
+      <path d="M2.5 16 V8 L9 2.2 L15.5 8 V16Z" fill="#fffaf0" stroke={K} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M1.5 8.5 L9 2 L16.5 8.5" fill="none" stroke="#e5007d" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="7" y="10.5" width="4" height="5.5" rx="0.8" fill="#1aa85a" stroke={K} strokeWidth="1" />
     </svg>
   );
 }

@@ -1,35 +1,43 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { TILES, GROUPS, BUILDINGS } from '../data/board';
 import { TileArt } from '../art/tileArt';
 import { rupees } from '../utils/format';
 import { unmortgageCost } from '../game/rules';
 
-// Smoothly tweens a number when it changes.
-function useAnimatedNumber(value, ms = 650) {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
-  const shownRef = useRef(value);
+// Zero-rerender smooth number counter using direct DOM textContent updates in rAF.
+// Eliminates 60fps React re-renders on mobile devices while keeping buttery-smooth cash rolls.
+export function Rupees({ value, className = '' }) {
+  const spanRef = useRef(null);
+  const currentRef = useRef(value);
+
   useEffect(() => {
-    from.current = shownRef.current;
+    const el = spanRef.current;
+    if (!el) return;
+    const from = currentRef.current;
+    if (from === value) {
+      el.textContent = rupees(value);
+      return;
+    }
+    const ms = 520;
     const start = performance.now();
     let raf;
     const step = (now) => {
       const t = Math.min(1, (now - start) / ms);
       const eased = 1 - (1 - t) ** 3;
-      const v = Math.round(from.current + (value - from.current) * eased);
-      shownRef.current = v;
-      setShown(v);
+      const v = Math.round(from + (value - from) * eased);
+      currentRef.current = v;
+      if (spanRef.current) spanRef.current.textContent = rupees(v);
       if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [value, ms]);
-  return shown;
-}
+  }, [value]);
 
-export function Rupees({ value, className = '' }) {
-  const v = useAnimatedNumber(value);
-  return <span className={className}>{rupees(v)}</span>;
+  return (
+    <span ref={spanRef} className={className}>
+      {rupees(value)}
+    </span>
+  );
 }
 
 // "**Name** paid ₹2,000" → bold names.
@@ -38,15 +46,16 @@ export function RichText({ text }) {
   return parts.map((part, i) => (part.startsWith('**') ? <b key={i}>{part.slice(2, -2)}</b> : <span key={i}>{part}</span>));
 }
 
-export function DeedCard({ tileId, owner, deed, compact = false }) {
+export function DeedCard({ tileId, owner, deed, boomGroup, compact = false }) {
   const tile = TILES[tileId];
   const group = tile.group ? GROUPS[tile.group] : null;
   const level = deed?.level || 0;
+  const isBoom = boomGroup && tile.group === boomGroup;
   return (
-    <div className={`deed ${compact ? 'deed-compact' : ''}`} style={{ '--g': group?.color || '#6d0f22', '--gt': group?.text || '#fff' }}>
+    <div className={`deed ${compact ? 'deed-compact' : ''} ${isBoom ? 'deed-boom' : ''}`} style={{ '--g': group?.color || '#6d0f22', '--gt': group?.text || '#fff' }}>
       <div className="deed-stamp-row">
         <span className="deed-registry">Nonopoly Bhu-Abhilekh · Title Deed</span>
-        <span className="deed-fee">₹100</span>
+        <span className="deed-fee">{isBoom ? '🔥 1.5× BOOM' : '₹100'}</span>
       </div>
       <div className="deed-band">
         <span className="deed-group">{group ? group.name : tile.city}</span>

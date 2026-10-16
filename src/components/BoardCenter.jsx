@@ -1,4 +1,4 @@
-import { TILES, JAIL_FINE } from '../data/board';
+import { TILES, GROUPS, BUILDINGS, JAIL_FINE } from '../data/board';
 import { botById } from '../data/characters';
 import { Rangoli, Gullak, Logo } from '../art/decor';
 import { Parrot, Aunty, Svg } from '../art/tileArt';
@@ -10,7 +10,7 @@ import Dice from './Dice';
 import { DeedCard, Rupees } from './ui';
 
 const TOAST_ICON = {
-  shagun: '🪔', double: '🎲', tax: '🧾', rent: '💸', chai: '☕', info: '📜', free: '🔓', jail: '⛓️', haveli: '🏰', trade: '🤝',
+  shagun: '🪔', double: '🎲', tax: '🧾', rent: '💸', chai: '☕', info: '📜', free: '🔓', jail: '⛓️', haveli: '🏰', trade: '🤝', chat: '💬',
 };
 
 function effectLabel(action) {
@@ -50,7 +50,7 @@ function Toasts({ toasts, players }) {
         const p = players.find((x) => x.id === t.pid);
         return (
           <div key={t.id} className={`toast toast-${t.tone}`} style={{ '--pc': p?.color || '#ffd34d' }}>
-            <span className="toast-icon">{TOAST_ICON[t.kind] || '✨'}</span>
+            <span className="toast-icon">{t.icon || TOAST_ICON[t.kind] || '✨'}</span>
             <span className="toast-text">
               <b>{t.title}</b>
               {t.sub && <small>{t.sub}</small>}
@@ -66,7 +66,7 @@ function Toasts({ toasts, players }) {
 function CardReveal({ card, prompt, players }) {
   const p = players.find((x) => x.id === card.pid);
   const eff = effectLabel(card.card.action);
-  const mine = prompt?.type === 'card' && prompt.pid === card.pid;
+  const mine = prompt?.type === 'card' && prompt.pid === card.pid && game.isControllableByMe(card.pid);
   return (
     <div className="card-stage">
       <div className={`fcard fcard-${card.deck}`} key={card.id}>
@@ -89,7 +89,7 @@ function CardReveal({ card, prompt, players }) {
                 Theek hai!
               </button>
             ) : (
-              <div className="fcard-who">{p?.name} drew this</div>
+              <div className="fcard-who">{p?.name} drew this card</div>
             )}
           </div>
         </div>
@@ -102,9 +102,9 @@ function AuctionPanel({ auction, prompt, players }) {
   const tile = TILES[auction.tileId];
   const leader = players.find((p) => p.id === auction.leaderId);
   const bidder = players.find((p) => p.id === auction.bidderId);
-  const myBid = prompt?.type === 'bid' ? prompt : null;
+  const myBid = prompt?.type === 'bid' && game.isControllableByMe(prompt.pid) ? prompt : null;
   const me = myBid ? players.find((p) => p.id === myBid.pid) : null;
-  const steps = myBid ? [1, 5, 10].map((k) => myBid.high + myBid.inc * k).filter((v, i) => i === 0 || v <= me.cash) : [];
+  const steps = myBid ? [1, 3, 6].map((k) => myBid.high + myBid.inc * k).filter((v, i) => i === 0 || v <= me.cash) : [];
   return (
     <div className="auction">
       <div className="auction-head">
@@ -142,7 +142,7 @@ function AuctionPanel({ auction, prompt, players }) {
         </div>
       ) : (
         <div className="auction-status">
-          {auction.done ? (leader ? `🎉 Sold to ${leader.name}!` : 'Nobody bid. It stays with the bank.') : bidder ? <>{bidder.name} is deciding<span className="dots" /></> : 'Going once…'}
+          {auction.done ? (leader ? `🎉 Sold to ${leader.name}!` : 'Nobody bid. It stays with the bank.') : bidder ? <>{bidder.name} is bidding<span className="dots" /></> : 'Going once…'}
         </div>
       )}
     </div>
@@ -157,17 +157,16 @@ function Dock({ s, onTrade, onOpenDeed }) {
 
   if (!current) return null;
 
-  // Human decisions
-  if (prompt && pp && !pp.isAi) {
+  if (prompt && pp && game.isControllableByMe(pp.id)) {
     const respond = (v) => game.respond(v, prompt.id);
     if (prompt.type === 'roll') {
       return (
         <div className="dock">
-          <TurnLabel player={pp} text={s.doubles > 0 ? 'Doubles! Roll again' : 'Your move'} />
+          <TurnLabel player={pp} text={s.doubles > 0 ? 'Doubles! Bonus roll' : 'Tap dice or Roll'} />
           <button className="btn btn-xl roll-btn" onClick={() => respond('roll')} autoFocus>
             <span className="roll-ico">🎲</span> {s.doubles > 0 ? 'Roll Again' : 'Roll Dice'}
           </button>
-          <button className="link-btn" onClick={onTrade}>🤝 Trade · Build from <b>Empire</b></button>
+          <button className="link-btn" onClick={onTrade}>🤝 Propose Trade · Build in <b>Empire</b></button>
         </div>
       );
     }
@@ -188,9 +187,9 @@ function Dock({ s, onTrade, onOpenDeed }) {
       const afford = pp.cash >= tile.price;
       return (
         <div className="dock dock-buy">
-          <div className="dock-ask" style={{ '--pc': pp.color }}>{pp.name}, buy this plot?</div>
+          <div className="dock-ask" style={{ '--pc': pp.color }}>{pp.name}, buy this landmark?</div>
           <button className="dock-deed" onClick={() => onOpenDeed(tile.id)} title="See full deed">
-            <DeedCard tileId={tile.id} compact />
+            <DeedCard tileId={tile.id} boomGroup={s.boomGroup} compact />
           </button>
           <div className="dock-row">
             <button className="btn btn-green" disabled={!afford} onClick={() => respond('buy')} autoFocus>
@@ -198,18 +197,58 @@ function Dock({ s, onTrade, onOpenDeed }) {
             </button>
             <button className="btn btn-plum" onClick={() => respond('auction')}>🔨 Auction</button>
           </div>
-          {!afford && <div className="dock-hint">Not enough cash. Mortgage something first, or auction it.</div>}
+          {!afford && <div className="dock-hint">Not enough cash. Mortgage from Empire, or send to Auction.</div>}
+        </div>
+      );
+    }
+    if (prompt.type === 'upgrade') {
+      const tile = TILES[prompt.tileId];
+      const bName = BUILDINGS[prompt.nextLevel]?.name || 'Building';
+      const newRent = tile.rent[prompt.nextLevel];
+      return (
+        <div className="dock dock-buy">
+          <div className="dock-ask" style={{ '--pc': pp.color }}>🏗️ Landed on your {tile.short}! Upgrade it?</div>
+          <div className="dock-hint">
+            Build a <b>{bName}</b> right now — rent jumps to <b>{rupeesShort(newRent)}</b>!
+          </div>
+          <div className="dock-row">
+            <button className="btn btn-green" onClick={() => respond('upgrade')} autoFocus>
+              🏗️ Build {bName} · {rupeesShort(prompt.cost)}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => respond('pass')}>Skip</button>
+          </div>
+        </div>
+      );
+    }
+    if (prompt.type === 'takeover') {
+      const tile = TILES[prompt.tileId];
+      const owner = s.players.find((p) => p.id === prompt.ownerId);
+      return (
+        <div className="dock dock-buy dock-takeover">
+          <div className="dock-ask" style={{ '--pc': pp.color }}>
+            🏴‍☠️ {prompt.completesMine ? 'Complete Your Monopoly!' : 'Hostile Takeover Opportunity!'}
+          </div>
+          <div className="dock-hint">
+            Buy out <b>{tile.name}</b> from <b>{owner?.name}</b> for <b>{rupees(prompt.cost)}</b>!
+            {prompt.completesMine && ' (Unlocks full colour set & Havelis!)'}
+          </div>
+          <div className="dock-row">
+            <button className="btn btn-pink" onClick={() => respond('takeover')} autoFocus>
+              🏴‍☠️ Takeover · {rupeesShort(prompt.cost)}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => respond('pass')}>Pass</button>
+          </div>
         </div>
       );
     }
     if (prompt.type === 'end') {
       return (
         <div className="dock">
-          <TurnLabel player={pp} text="Build, trade, then end your turn" />
+          <TurnLabel player={pp} text="Build, trade, or finish turn" />
           <div className="dock-row">
             <button className="btn btn-lg btn-pink" onClick={() => respond('end')} autoFocus>End Turn ➜</button>
           </div>
-          <button className="link-btn" onClick={onTrade}>🤝 Open Sauda Bazaar</button>
+          <button className="link-btn" onClick={onTrade}>🤝 Open Sauda Bazaar (Trade)</button>
         </div>
       );
     }
@@ -232,17 +271,45 @@ function Dock({ s, onTrade, onOpenDeed }) {
     }
   }
 
-  // Bot turn / animations
-  const busy = s.rolling ? 'Rolling' : s.moving ? 'On the move' : s.thinking ? 'Thinking' : '';
+  // Watching an Online Friend's turn or Bot turn
+  const activeActor = pp || current;
+  const busy = s.rolling
+    ? 'Shaking the dice'
+    : s.moving
+      ? 'Cruising across India'
+      : s.thinking
+        ? 'Plotting next move'
+        : prompt?.type === 'buy'
+          ? `Inspecting ${TILES[prompt.tileId]?.short}`
+          : prompt?.type === 'takeover'
+            ? `Eyeing a takeover on ${TILES[prompt.tileId]?.short}`
+            : prompt?.type === 'upgrade'
+              ? `Upgrading ${TILES[prompt.tileId]?.short}`
+              : prompt?.type === 'end'
+                ? 'Managing Empire'
+                : prompt?.type === 'roll'
+                  ? 'Ready to roll'
+                  : '';
+
   return (
     <div className="dock dock-watch">
-      <TurnLabel player={current} text={current.isAi ? botById(current.botId).title : busy ? `${busy}…` : 'Your move'} />
+      <TurnLabel
+        player={activeActor}
+        text={activeActor.isAi ? `${botById(activeActor.botId).title} · ${busy || 'Playing'}` : busy ? `${busy}…` : 'Online turn'}
+      />
       {speech ? (
         <div className="speech" key={s.speech.id} style={{ '--pc': speech.color }}>
           <b>{speech.name}:</b> “{s.speech.text}”
         </div>
       ) : (
-        current.isAi && <div className="watch-status">{busy}{busy && <span className="dots" />}</div>
+        <div className="watch-status">
+          {busy}{busy && <span className="dots" />}
+        </div>
+      )}
+      {s.online?.active && s.online?.isHost && !activeActor.isAi && !game.isControllableByMe(activeActor.id) && (
+        <button className="link-btn" onClick={() => game.convertToBot(activeActor.id)} title="Switch AFK friend to AI Bot">
+          🤖 Player offline? Switch {activeActor.name} to Bot
+        </button>
       )}
     </div>
   );
@@ -253,7 +320,7 @@ function TurnLabel({ player, text }) {
     <div className="turn-label" style={{ '--pc': player.color }}>
       <PlayerAvatar player={player} className="sm" />
       <div>
-        <div className="turn-name">{player.name}’s turn</div>
+        <div className="turn-name">{player.name}’s Turn</div>
         <div className="turn-sub">{text}</div>
       </div>
     </div>
@@ -262,20 +329,43 @@ function TurnLabel({ player, text }) {
 
 export default function BoardCenter({ s, onTrade, onOpenDeed }) {
   const max = s.config?.maxRounds;
+  const canRoll = s.prompt?.type === 'roll' && game.isControllableByMe(s.prompt.pid);
+  const boomGroup = s.boomGroup ? GROUPS[s.boomGroup] : null;
+  const multTxt = s.bullRun ? '1.75×' : '1.5×';
+
   return (
-    <div className="center">
+    <div className={`center ${s.bullRun ? 'bull-run-active' : ''}`}>
       <Rangoli className="center-rangoli" />
       <Deck type="kismet" />
       <Deck type="rishtedaar" />
       <div className="center-top">
         <Logo size="md" className="center-logo" />
-        <div className="center-round">Round {s.round}{max ? ` / ${max}` : ''}</div>
+        <div className="center-badges-row">
+          <span className="center-round">Round {s.round}{max ? ` / ${max}` : ''}</span>
+          {boomGroup && (
+            <span className="center-boom-pill" style={{ '--g': boomGroup.color }} title={`Bazaar Utsav: ${boomGroup.name} rents are ${multTxt} this round!`}>
+              🔥 {boomGroup.name} {multTxt}
+            </span>
+          )}
+          {s.bullRun && (
+            <span className="center-bull-pill" title="Sensex Bull Run: Hostile Takeovers unlocked!">
+              🐂 KABZA OPEN
+            </span>
+          )}
+        </div>
       </div>
       <div className="center-mid">
-        <Dice dice={s.dice} rollId={s.rollId} rolling={s.rolling} double={s.lastDouble} />
+        <Dice
+          dice={s.dice}
+          rollId={s.rollId}
+          rolling={s.rolling}
+          double={s.lastDouble}
+          canRoll={canRoll}
+          onRoll={() => canRoll && game.respond('roll', s.prompt.id)}
+        />
         <Dock s={s} onTrade={onTrade} onOpenDeed={onOpenDeed} />
       </div>
-      <div className="gullak-box" title="Jugaad Gullak: every tax and fine lands here. Land on Jugaad Junction to win it all.">
+      <div className="gullak-box" title="Jugaad Gullak: every tax and fine lands here. Land on Jugaad Junction to win it all!">
         <Gullak className="gullak-art" />
         <div>
           <div className="gullak-label">Jugaad Gullak</div>

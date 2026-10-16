@@ -1,4 +1,4 @@
-// Two 3D CSS dice. Each roll adds full turns so the cube tumbles before settling on its face.
+// Two 3D CSS dice. Tap directly on the dice when it's your turn to roll!
 const FACE_ROT = {
   1: [0, 0],
   6: [0, 180],
@@ -46,12 +46,35 @@ function Die({ value, rollId, idx }) {
   );
 }
 
-export default function Dice({ dice, rollId, rolling, double }) {
+export default function Dice({ dice, rollId, rolling, double, canRoll, onRoll }) {
+  const sum = (dice?.[0] || 0) + (dice?.[1] || 0);
+  const badgeText = double
+    ? `DOUBLE ${sum}! 🔥`
+    : sum === 12
+      ? '12 · SIXER! 🏏'
+      : sum === 7 && rollId > 0
+        ? '7 · LUCKY!'
+        : rollId > 0
+          ? `${sum}`
+          : null;
+
   return (
-    <div className={`dice-tray ${rolling ? 'rolling' : ''} ${double && !rolling ? 'double' : ''}`} aria-label={`Dice show ${dice[0]} and ${dice[1]}`} role="img">
+    <div
+      className={`dice-tray ${rolling ? 'rolling' : ''} ${double && !rolling ? 'double' : ''} ${canRoll ? 'can-roll' : ''}`}
+      aria-label={`Dice show ${dice[0]} and ${dice[1]}`}
+      role={canRoll ? 'button' : 'img'}
+      tabIndex={canRoll ? 0 : -1}
+      onClick={canRoll ? onRoll : undefined}
+      onKeyDown={canRoll ? (e) => (e.key === 'Enter' || e.key === ' ') && onRoll?.() : undefined}
+      title={canRoll ? 'Tap to Roll Dice!' : undefined}
+    >
       <Die value={dice[0]} rollId={rollId} idx={0} />
       <Die value={dice[1]} rollId={rollId} idx={1} />
-      {double && !rolling && <span className="double-badge">DOUBLE!</span>}
+      {!rolling && badgeText && (
+        <span className={`double-badge ${double ? 'is-double' : 'is-sum'}`} key={`${rollId}-${sum}`}>
+          {badgeText}
+        </span>
+      )}
     </div>
   );
 }

@@ -1,128 +1,112 @@
 // Nonopoly Multiplayer WebSocket Server
-// Run with: node server.js
+// Run with: node server.js (also embedded automatically in Vite dev server at /ws)
 
 import { WebSocketServer, WebSocket } from 'ws';
 
 const PORT = process.env.PORT || 3001;
-const wss = new WebSocketServer({ port: PORT });
 
-// Active rooms storage: roomCode -> { hostId, players: [], gameState: null }
-const rooms = new Map();
+export function attachRoomServer(wss) {
+  // roomCode -> { code, hostClientId, lobby, lastState, clients: Map<ws, clientId> }
+  const rooms = new Map();
 
-console.log(`🇮🇳 Nonopoly Online Game Server running on ws://localhost:${PORT}`);
-
-wss.on('connection', (ws) => {
-  let currentRoom = null;
-  let playerId = null;
-
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message.toString());
-      const { type, roomCode, payload } = data;
-
-      // 1. Create Room
-      if (type === 'CREATE_ROOM') {
-        const code = roomCode || Math.random().toString(36).substring(2, 6).toUpperCase();
-        currentRoom = code;
-        playerId = payload.player.id;
-
-        rooms.set(code, {
-          code,
-          hostId: playerId,
-          players: [{ ...payload.player, ws }],
-          gameState: payload.gameState || null,
-        });
-
-        ws.send(JSON.stringify({
-          type: 'ROOM_CREATED',
-          roomCode: code,
-          player: payload.player,
-        }));
-        console.log(`Room created: ${code} by ${payload.player.name}`);
+  function broadcastToRoom(roomCode, messageObj, excludeWs = null) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const raw = JSON.stringify(messageObj);
+    for (const [clientWs] of room.clients.entries()) {
+      if (clientWs !== excludeWs && clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(raw);
       }
+    }
+  }
 
-      // 2. Join Room
-      else if (type === 'JOIN_ROOM') {
-        const room = rooms.get(roomCode);
-        if (!room) {
-          ws.send(JSON.stringify({ type: 'ERROR', message: 'Room nahi mila! Code check karein.' }));
+  wss.on('connection', (ws) => {
+    let currentRoom = null;
+    let currentClientId = null;
+
+    ws.on('message', (rawMessage) => {
+      try {
+        const data = JSON.parse(rawMessage.toString());
+        const { type, roomCode, payload, senderClientId } = data;
+        const code = (roomCode || currentRoom || '').toUpperCase();
+
+        if (senderClientId) currentClientId = senderClientId;
+
+        if (type === 'CREATE_ROOM') {
+          currentRoom = code;
+          currentClientId = payload?.clientId || senderClientId;
+          const room = {
+            code,
+            hostClientId: currentClientId,
+            lobby: payload?.lobby || null,
+            lastState: null,
+            clients: new Map([[ws, currentClientId]]),
+          };
+          rooms.set(code, room);
+          ws.send(JSON.stringify({ type: 'ROOM_CREATED', roomCode: code, lobby: room.lobby }));
           return;
         }
 
-        if (room.players.length >= 4) {
-          ws.send(JSON.stringify({ type: 'ERROR', message: 'Room full hai (Max 4 players)!' }));
+        if (type === 'JOIN_ROOM') {
+          const room = rooms.get(code);
+          if (!room) {
+            ws.send(JSON.stringify({ type: 'ERROR', message: `Room "${code}" nahi mila! Check the code.` }));
+            return;
+          }
+          currentRoom = code;
+          currentClientId = payload?.clientId || senderClientId;
+          room.clients.set(ws, currentClientId);
+
+          // Forward JOIN_ROOM envelope to the room (Host processes seat assignment and broadcasts LOBBY_SYNC)
+          broadcastToRoom(code, data);
           return;
         }
 
-        currentRoom = roomCode;
-        playerId = payload.player.id;
-        room.players.push({ ...payload.player, ws });
+        if (!code || !rooms.has(code)) return;
+        const room = rooms.get(code);
+        room.clients.set(ws, currentClientId);
 
-        // Broadcast player joined to everyone in the room
-        broadcastToRoom(roomCode, {
-          type: 'PLAYER_JOINED',
-          players: room.players.map((p) => ({
-            id: p.id,
-            name: p.name,
-            token: p.token,
-            isAi: false,
-          })),
-        });
-        console.log(`${payload.player.name} joined room: ${roomCode}`);
+        if (type === 'LOBBY_SYNC' && payload?.lobby) {
+          room.lobby = payload.lobby;
+        } else if (type === 'STATE_SYNC' && payload?.state) {
+          room.lastState = payload.state;
+        }
+
+        broadcastToRoom(code, data, ws);
+      } catch (err) {
+        console.error('WS message error:', err);
       }
+    });
 
-      // 3. Sync Game State Action
-      else if (type === 'SYNC_STATE') {
-        const room = rooms.get(roomCode);
-        if (room) {
-          room.gameState = payload.gameState;
-          broadcastToRoom(roomCode, {
-            type: 'STATE_UPDATED',
-            gameState: payload.gameState,
-            senderId: playerId,
-          }, ws); // Send to all others
+    ws.on('close', () => {
+      if (currentRoom && rooms.has(currentRoom)) {
+        const room = rooms.get(currentRoom);
+        room.clients.delete(ws);
+        if (room.clients.size === 0) {
+          // Keep room alive for 2 minutes in case of mobile page refresh
+          setTimeout(() => {
+            const r = rooms.get(currentRoom);
+            if (r && r.clients.size === 0) {
+              rooms.delete(currentRoom);
+            }
+          }, 120000);
+        } else if (currentClientId) {
+          broadcastToRoom(currentRoom, {
+            type: 'LEAVE_ROOM',
+            roomCode: currentRoom,
+            senderClientId: currentClientId,
+            payload: { clientId: currentClientId },
+          });
         }
       }
-
-      // 4. In-Game Desi Chat
-      else if (type === 'CHAT_MESSAGE') {
-        broadcastToRoom(roomCode, {
-          type: 'CHAT_MESSAGE',
-          sender: payload.sender,
-          text: payload.text,
-          time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        });
-      }
-    } catch (err) {
-      console.error('Error parsing WS message:', err);
-    }
+    });
   });
+}
 
-  ws.on('close', () => {
-    if (currentRoom && rooms.has(currentRoom)) {
-      const room = rooms.get(currentRoom);
-      room.players = room.players.filter((p) => p.ws !== ws);
-      if (room.players.length === 0) {
-        rooms.delete(currentRoom);
-        console.log(`Room ${currentRoom} deleted (all left).`);
-      } else {
-        broadcastToRoom(currentRoom, {
-          type: 'PLAYER_LEFT',
-          playerId,
-        });
-      }
-    }
-  });
-});
-
-function broadcastToRoom(roomCode, payload, excludeWs = null) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-
-  const msg = JSON.stringify(payload);
-  room.players.forEach((p) => {
-    if (p.ws && p.ws.readyState === WebSocket.OPEN && p.ws !== excludeWs) {
-      p.ws.send(msg);
-    }
-  });
+// Start standalone server if run directly via `node server.js`
+const isMain = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('server.js');
+if (isMain) {
+  const wss = new WebSocketServer({ port: PORT });
+  attachRoomServer(wss);
+  console.log(`🇮🇳 Nonopoly Online Game Server running on ws://localhost:${PORT}`);
 }
