@@ -823,6 +823,12 @@
   border-color: rgba(95, 240, 226, 0.5);
 }
 
+.mini-btn.girvi-btn {
+  background: rgba(226, 50, 58, 0.16);
+  border-color: rgba(255, 122, 110, 0.45);
+  color: #ffd0cc;
+}
+
 /* ================= BOARD CENTRE ================= */
 .center {
   position: absolute;
@@ -1087,7 +1093,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(5px, 1.5cqh, 12px);
+  gap: clamp(5px, 1.5cqh, 11px);
   width: min(100%, 420px);
   animation: dockIn 0.3s var(--ease-pop);
 }
@@ -1100,7 +1106,52 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
+  gap: 7px;
+}
+
+.dock-card {
+  width: min(94%, 340px);
+  padding: clamp(8px, 1.8cqh, 13px) clamp(10px, 2.4cqw, 15px);
+  border-radius: 18px;
+  background: rgba(255, 251, 242, 0.96);
+  border: 2.5px solid #2b0838;
+  box-shadow:
+    0 5px 0 color-mix(in srgb, var(--pc, #ff9f1c) 75%, #2b0838),
+    0 14px 28px -10px rgba(42, 20, 8, 0.48);
+  gap: clamp(5px, 1.2cqh, 9px);
+}
+
+.dock-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
+  width: 100%;
+}
+
+.dock-cash-pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: clamp(9.5px, 2cqw, 12px);
+  background: #e7f9ee;
+  color: #0e6f38;
+  border: 1.5px solid #1aa85a;
+  white-space: nowrap;
+}
+
+.dock-card .dock-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 7px;
+}
+
+.dock-card .dock-row .btn {
+  width: 100%;
+  padding: 0.54em 0.8em 0.5em;
+  font-size: clamp(11px, 2.5cqw, 14px);
 }
 
 .turn-label {
@@ -1144,57 +1195,110 @@
 }
 
 .link-btn {
-  border: 0;
-  background: none;
-  padding: 2px 6px;
-  font-size: clamp(9.5px, 2.1cqw, 13px);
-  font-weight: 700;
-  color: var(--ink-2);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  border: 1.5px solid #8c4f19;
+  background: #fff3cd;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: clamp(9.5px, 2.1cqw, 12.5px);
+  font-weight: 800;
+  color: #3a1500;
+  text-decoration: none;
+  box-shadow: 0 2px 0 #8c4f19;
+  transition: transform 0.1s;
+}
+
+.link-btn:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
 }
 
 .link-btn b { color: #b5006a; }
 
-.dock-buy { gap: 6px; }
-
 .dock-ask {
-  padding: 2px 12px;
+  padding: 2px 11px;
   border-radius: 999px;
   font-weight: 800;
-  font-size: clamp(10px, 2.4cqw, 14px);
+  font-size: clamp(9.5px, 2.2cqw, 13px);
   color: #fff;
-  background: var(--pc);
+  background: var(--pc, #2b0838);
   border: 2px solid #2b0838;
+  white-space: nowrap;
 }
 
 .dock-deed {
   border: 0;
   padding: 0;
   background: none;
-  width: min(100%, 280px);
+  width: 100%;
+}
+
+.dock-upgrade-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--g, #ff9f1c) 18%, #fff6e5), #fffdf7);
+  border: 1.5px solid color-mix(in srgb, var(--g, #ff9f1c) 65%, #2b0838);
+  border-left: 5px solid var(--g, #ff9f1c);
+  color: var(--ink);
+  text-align: left;
+}
+
+.dock-upg-name {
+  font-weight: 800;
+  font-size: clamp(11.5px, 2.7cqw, 15.5px);
+  line-height: 1.1;
+}
+
+.dock-upg-sub {
+  font-size: clamp(9px, 2cqw, 11.5px);
+  color: var(--ink-2);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.dock-upg-badge {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: clamp(9px, 2cqw, 11.5px);
+  background: #2b0838;
+  color: var(--gold-2);
+  white-space: nowrap;
 }
 
 .dock-hint {
   max-width: 320px;
   text-align: center;
-  font-size: clamp(9.5px, 2cqw, 12px);
-  font-weight: 600;
+  font-size: clamp(9px, 1.95cqw, 11.5px);
+  font-weight: 700;
   color: var(--ink-2);
   line-height: 1.2;
 }
 
-.dock-debt {
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: #fff1f1;
-  border: 2px solid #c1121f;
+.dock-hint.warn {
+  color: #b0101b;
+  background: #ffe3e3;
+  padding: 2px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(176, 16, 27, 0.3);
+}
+
+.dock-card.dock-debt {
+  background: #fff3f3;
+  border-color: #c1121f;
+  box-shadow: 0 5px 0 #8a0a14, 0 14px 28px -10px rgba(140, 10, 20, 0.42);
 }
 
 .debt-title {
   font-weight: 800;
-  font-size: clamp(13px, 3cqw, 18px);
+  font-size: clamp(12.5px, 2.9cqw, 17px);
   color: #b0101b;
+  text-align: center;
 }
 
 .dock-watch { gap: 8px; }
@@ -1498,9 +1602,8 @@
   .center-mid { padding: 0 3cqw 13cqh; gap: 1.5cqh; }
   .turn-label { padding: 3px 10px 3px 3px; }
   .turn-label .avatar.sm { --size: 24px; }
-  .link-btn { display: none; }
   .gullak-box { left: 2.5cqw; bottom: 2.5cqh; }
-  .dock-deed { width: min(100%, 220px); }
+  .dock-card { width: min(96%, 290px); padding: 6px 8px; }
 }
 
 @container center (max-width: 300px) {
@@ -1683,11 +1786,6 @@
   background: linear-gradient(135deg, #e5007d, #ff5e00);
   border: 1.5px solid #2b0838;
   box-shadow: 0 2px 0 #2b0838;
-}
-
-.dock-takeover {
-  border-color: #e5007d;
-  box-shadow: 0 5px 0 #e5007d, 0 12px 24px -10px rgba(0, 0, 0, 0.6);
 }
 
 /* ================= V3: SLEEK TYCOON CARDS (fit 6 players, zero scroll) ================= */

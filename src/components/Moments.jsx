@@ -26,7 +26,7 @@ function burst(kind, color) {
   if (reduce) return;
   if (kind === 'sold') {
     confetti({ particleCount: 55, spread: 75, startVelocity: 36, origin: { y: 0.6 }, colors: FESTIVE, scalar: 0.9 });
-  } else if (kind === 'monopoly' || kind === 'haveli' || kind === 'takeover') {
+  } else if (kind === 'monopoly' || kind === 'haveli') {
     const end = Date.now() + 900;
     const colors = [color || '#ffd23f', '#ffd23f', '#ffffff', '#ff4fa3'];
     (function frame() {
@@ -71,7 +71,7 @@ export default function Moments({ s }) {
           <TileArt id={tile.id} className="mo-card-art" />
           <div className="mo-card-name">{tile.name}</div>
           <div className="mo-card-price">{rupees(m.amount)}</div>
-          <div className="stamp">{m.auction ? 'NEELAAM!' : 'KABZA!'}</div>
+          <div className="stamp">{m.auction ? 'NEELAAM!' : 'SOLD!'}</div>
         </div>
         <div className="mo-caption">
           <PlayerAvatar player={player} className="md" />
@@ -136,40 +136,6 @@ export default function Moments({ s }) {
             {m.group === 'transport' || m.group === 'utility'
               ? '⚡ Peak Network Rent Unlocked!'
               : '🔥 Base Rents DOUBLE · Showrooms, Mega Malls & Havelis Unlocked!'}
-          </div>
-        </div>
-        <span className="cutscene-skip">Tap anywhere to continue</span>
-      </div>
-    );
-  }
-
-  if (m.kind === 'takeover') {
-    const tile = TILES[m.tileId];
-    return (
-      <div className="moment moment-takeover cutscene-wrap" key={m.id} style={{ '--pc': player?.color }} onClick={skip}>
-        <div className="rays gold" />
-        <div className="cutscene-banner">
-          <div className="cs-kicker">🏴‍☠️ CORPORATE RAID · FORCED BUYOUT</div>
-          <div className="mo-big">HOSTILE TAKEOVER!</div>
-          <div className="mo-transfer">
-            <div className="cs-combatant">
-              <PlayerAvatar player={player} className="xl" />
-              <b>{player?.name}</b>
-              <small className="gain">NEELAM / KABZA</small>
-            </div>
-            <div className="cs-clash-mid">
-              <TileArt id={tile.id} className="cs-clash-tile" />
-              <span className="mo-amount">{rupees(m.amount)}</span>
-              <span className="cs-bolt">⚡</span>
-            </div>
-            <div className="cs-combatant">
-              <PlayerAvatar player={other} className="xl" />
-              <b>{other?.name}</b>
-              <small className="loss">OUSTED OWNER</small>
-            </div>
-          </div>
-          <div className="mo-sub">
-            <b>{player?.name}</b> forcibly bought out <b>{tile.name}</b> from <b>{other?.name}</b>!
           </div>
         </div>
         <span className="cutscene-skip">Tap anywhere to continue</span>

@@ -363,13 +363,13 @@ export default function Landing({ onPlayLocal, onPlayOnline, onQuickPlay, onResu
 
           <h1 className="hero-title">The Great Indian Business Board Game</h1>
           <p className="hero-tag">
-            Buy <b>Marine Drive</b> &amp; <b>Hawa Mahal</b>, build <b>Royal Havelis</b>, pull off <b>Hostile Kabza</b>, and outsmart <b>6 spicy AI rivals</b> — locally or live with friends!
+            Buy <b>Marine Drive</b> &amp; <b>Hawa Mahal</b>, build <b>Royal Havelis</b>, win <b>Live Neelaami Auctions</b>, and outsmart <b>6 spicy AI rivals</b> — locally or live with friends!
           </p>
 
           {/* Feature Badge Pills */}
           <div className="hero-features-chips">
             <span className="hf-chip">🏰 Royal Havelis &amp; Spot Upgrades</span>
-            <span className="hf-chip">⚡ Kabza / Takeovers</span>
+            <span className="hf-chip">🔨 Live Neelaami Auctions</span>
             <span className="hf-chip">🗣️ Smart Bot Trash-Talk</span>
             <span className="hf-chip">🌐 Instant Room Codes</span>
           </div>
@@ -457,6 +457,9 @@ export default function Landing({ onPlayLocal, onPlayOnline, onQuickPlay, onResu
                 </div>
               </div>
             ))}
+          </div>
+          <div className="modal-foot">
+            <button className="btn" onClick={() => setRivalsOpen(false)}>Chalo, Dekhte Hain! Let’s Play</button>
           </div>
         </Modal>
       )}

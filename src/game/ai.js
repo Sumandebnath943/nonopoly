@@ -1,5 +1,5 @@
 // Bot brains. Each bot profile (data/characters.js) tunes buffer, risk, auction appetite,
-// hostile takeover aggression, and proactive trade generation.
+// spot upgrades, and proactive trade generation.
 
 import { TILES, GROUPS, JAIL_FINE } from '../data/board';
 import { botById } from '../data/characters';
@@ -8,7 +8,6 @@ import {
   countOwnedInGroup,
   canBuild,
   canSpotUpgrade,
-  canTakeover,
   unmortgageCost,
   ownedIds,
   ownsGroup,
@@ -96,21 +95,6 @@ export function decideSpotUpgrade(state, player, tileId) {
   const bot = botById(player.botId);
   const reserve = Math.max(50000, bot.buffer * 0.5);
   return player.cash - chk.cost >= reserve;
-}
-
-export function decideTakeover(state, player, tileId) {
-  const chk = canTakeover(state, player.id, tileId);
-  if (!chk.ok) return false;
-  const bot = botById(player.botId);
-  // Always takeover if it completes a monopoly and leaves at least ₹60k!
-  if (chk.completesMine && player.cash - chk.cost >= 60000) return true;
-  // High-risk or rich bots also takeover favourite city groups in Bull Run
-  const tile = TILES[tileId];
-  const reserve = Math.max(120000, bot.buffer);
-  if (player.cash - chk.cost >= reserve && (bot.likes.includes(tile.group) || Math.random() < bot.risk * 0.55)) {
-    return true;
-  }
-  return false;
 }
 
 // Plan building upgrades (even-build rule respected by re-checking after each step).
@@ -396,20 +380,6 @@ export function generateBotTrashTalk(state, botPlayer, event, ctx = {}) {
       ]);
     }
 
-    case 'takeover': {
-      const { victim, tile, cost } = ctx;
-      if (!victim || !tile) return bot.lines.takeover;
-      const tkLines = {
-        gupta: `Cash phenko, tamasha dekho! ${victim.name} ji, ${rupeesShort(cost)} pakdo aur ${tile.short} ki chaabi do!`,
-        bunty: `Hostile M&A complete! Sorry ${victim.name}, ${tile.short} now belongs to Bunty Ventures!`,
-        tauji: `Oye ${victim.name}, ${rupeesShort(cost)} gino aur ${tile.short} se boriya-bistar sameto! Kabza pakka!`,
-        aunty: `${victim.name} beta, बड़ों से ज़िद नहीं करते! Take ${rupeesShort(cost)} and hand over ${tile.short}!`,
-        chintu: `SURPRISE KABZA PRANK ON ${victim.name.toUpperCase()}! Bought out ${tile.short} live! 🔥`,
-        simran: `Executed a ${rupeesShort(cost)} buyout on ${victim.name}’s ${tile.short}. Check your balance.`,
-      };
-      return tkLines[botPlayer.botId] || bot.lines.takeover;
-    }
-
     case 'haveli': {
       const { tile } = ctx;
       const targetName = leader ? leader.name : 'sab log';
@@ -462,7 +432,7 @@ export function generateBotTrashTalk(state, botPlayer, event, ctx = {}) {
       const personaClapbacks = {
         gupta: `Baatein kam karo ${sName}, meri dukaan pe aao toh kiraya ready rakhna!`,
         bunty: `Cute trash-talk ${sName} bro, let’s see your P&L statement after this round!`,
-        tauji: `Halki aawaz mein baat kar ${sName}, warna tere plot pe abhi Kabza maar dunga!`,
+        tauji: `Halki aawaz mein baat kar ${sName}, warna tere saare plot Neelaami mein khareed lunga!`,
         aunty: `Haye ${sName} beta, itna attitude achi baat nahi—abhi colony group mein batati hoon!`,
         chintu: `${sName} trying to roast me for clout! Ratio + L + pay rent bro! 😂`,
         simran: `Statistically speaking ${sName}, your bankruptcy probability just went up 18%.`,

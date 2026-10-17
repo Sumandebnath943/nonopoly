@@ -41,7 +41,6 @@ export const BOTS = [
       jail: 'Arey Vakil sahab ko bulao! Every hour in Tihar costs interest.',
       monopoly: 'Purani Dilli se lekar bazaar tak—ab har dukaan pe Gupta & Sons ka board lagega!',
       haveli: 'Dekho ji, pure makrana marble ki Shahi Haveli! Ab kiraya double nahi, chappad phaad ke!',
-      takeover: 'Cash phenko, tamasha dekho! This property now belongs to Gupta Sons!',
     },
   },
   {
@@ -66,7 +65,6 @@ export const BOTS = [
       jail: 'Bro, can I get artisanal cold brew in Tihar? Posting bail now.',
       monopoly: 'Full vertical integration unlocked! We own the entire category now, bro!',
       haveli: 'Just dropped a ₹20Cr Penthouse Haveli with a helipad! Peak valuation!',
-      takeover: 'Hostile M&A complete! Your plot just got acquired by Bunty Ventures!',
     },
   },
   {
@@ -91,7 +89,6 @@ export const BOTS = [
       jail: 'Thane-kachehri toh shero ke liye bane hain! Bail bharo re!',
       monopoly: 'Poora sector kabze mein! Ab yahan parinda bhi par maarega toh kiraya dega!',
       haveli: 'Chaudhary Sahab ki Shahi Haveli khadi ho gayi! Dhol bajao re!',
-      takeover: 'Muh-maanga daam lo aur kalti maaro! Yeh zameen ab Tauji ki hai!',
     },
   },
   {
@@ -116,7 +113,6 @@ export const BOTS = [
       jail: 'Haye Ram! Before Mrs. Verma sees me here, pay the bail immediately!',
       monopoly: 'Saari posh market ab Pammi Aunty ki! Kitty party ab yahin hogi!',
       haveli: 'Chandeliers from Milan, marble from Jaipur—dekho Pammi Ji ki Haveli!',
-      takeover: 'Beta, बड़ों से बहस नहीं करते. Take double cash and hand over the keys!',
     },
   },
   {
@@ -141,7 +137,6 @@ export const BOTS = [
       jail: '24 Hours in Tihar Jail Challenge! Thumbnail toh viral hai bhai!',
       monopoly: 'WE OWN THE WHOLE STRETCH FAM! Drop a 🔥 in the comments!',
       haveli: 'Welcome to the Official Creator Mansion Haveli! Tour video dropping tonight!',
-      takeover: 'Surprise Buyout Prank! Here is 2x cash, hand over the deed bro!',
     },
   },
   {
@@ -166,7 +161,6 @@ export const BOTS = [
       jail: 'Opportunity cost of sitting in Tihar is too high. Paying bail.',
       monopoly: 'Dominant market share secured. Prepare for exponential rent scaling.',
       haveli: 'Flagship Royal Haveli online. Maximum yield per square foot achieved.',
-      takeover: 'Executing strategic buyout clause. Check your account—the transfer is done.',
     },
   },
 ];
@@ -216,10 +210,10 @@ export const PREWRITTEN_TRASH_TALKS = [
   {
     id: 'kabza_soon',
     cat: 'flex',
-    emoji: '🏴‍☠️',
-    label: 'Kabza Coming',
-    text: 'Cash ready hai—aaj kisi ke plot pe Hostile Kabza pakka!',
-    targeted: (name) => `${name}, apni property bacha le, mera Kabza aane wala hai!`,
+    emoji: '💼',
+    label: 'Bazaar King',
+    text: 'Cash aur deals ready hain—aaj poora bazaar khareedunga!',
+    targeted: (name) => `${name}, sauda kar le warna kiraya de-de ke thak jayega!`,
   },
   {
     id: 'seth',

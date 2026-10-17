@@ -89,49 +89,6 @@ export function canSpotUpgrade(state, pid, id) {
   return { ok: true, cost: tile.houseCost, nextLevel: deed.level + 1, fullSet };
 }
 
-// Hostile Takeover (Kabza Buyout): Prevents mid/late-game stagnation when properties are split!
-// Allowed when:
-// - Either the player owns the other properties in this colour group (completes their monopoly!),
-// - OR the market is mature: Round >= 5, or 4 or fewer ownable plots remain unowned.
-// Cannot takeover a property if the current owner already owns the FULL colour group or has built a Showroom/Mall/Haveli (level >= 3).
-export function takeoverCost(state, pid, id) {
-  const tile = TILES[id];
-  const deed = state.deeds[id];
-  if (!tile || !deed || ! isOwnable(tile)) return 0;
-  const g = tile.group;
-  const size = g ? GROUPS[g].ids.length : 1;
-  const myCount = g ? countOwnedInGroup(state, g, pid) : 0;
-  const completesMine = g && size > 1 && myCount === size - 1;
-  const mult = completesMine ? 1.8 : 2.0;
-  const bldValue = (deed.level || 0) * (tile.houseCost || 0);
-  return Math.round((tile.price * mult + bldValue) / 5000) * 5000;
-}
-
-export function canTakeover(state, pid, id) {
-  const tile = TILES[id];
-  const deed = state.deeds[id];
-  const player = state.players.find((p) => p.id === pid);
-  if (!player || !deed || !deed.owner || deed.owner === pid || tile.type !== 'property') {
-    return { ok: false };
-  }
-  // Protected if owner holds the complete colour group or built level >= 3
-  if (ownsGroup(state, tile.group, deed.owner) || (deed.level || 0) >= 3) {
-    return { ok: false, reason: 'Protected monopoly / fortress' };
-  }
-  const size = GROUPS[tile.group].ids.length;
-  const myCount = countOwnedInGroup(state, tile.group, pid);
-  const completesMine = myCount === size - 1;
-  const marketOpen = state.round >= 5 || unownedPropertyCount(state) <= 4;
-  if (!completesMine && !marketOpen) {
-    return { ok: false, reason: 'Hostile takeovers unlock in Round 5 or when completing a set' };
-  }
-  const cost = takeoverCost(state, pid, id);
-  if (player.cash < cost) {
-    return { ok: false, cost, completesMine, reason: 'Not enough cash for takeover' };
-  }
-  return { ok: true, cost, completesMine };
-}
-
 export function canSell(state, pid, id) {
   const tile = TILES[id];
   const deed = state.deeds[id];

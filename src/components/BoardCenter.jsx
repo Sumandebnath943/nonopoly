@@ -68,8 +68,8 @@ function CardReveal({ card, prompt, players }) {
   const eff = effectLabel(card.card.action);
   const mine = prompt?.type === 'card' && prompt.pid === card.pid && game.isControllableByMe(card.pid);
   return (
-    <div className="card-stage">
-      <div className={`fcard fcard-${card.deck}`} key={card.id}>
+    <div className="card-stage" onClick={() => mine && game.respond('ok', prompt.id)}>
+      <div className={`fcard fcard-${card.deck}`} key={card.id} onClick={(e) => e.stopPropagation()}>
         <div className="fcard-inner">
           <div className="fcard-face fcard-back">
             <Svg className="fcard-back-art">{card.deck === 'kismet' ? <Parrot /> : <Aunty />}</Svg>
@@ -85,8 +85,8 @@ function CardReveal({ card, prompt, players }) {
             <p className="fcard-text">{card.card.text}</p>
             <div className={`fcard-effect ${eff.tone}`}>{eff.text}</div>
             {mine ? (
-              <button className="btn btn-sm fcard-ok" onClick={() => game.respond('ok', prompt.id)} autoFocus>
-                Theek hai!
+              <button className="btn fcard-ok" onClick={() => game.respond('ok', prompt.id)} autoFocus>
+                Theek Hai! ➜
               </button>
             ) : (
               <div className="fcard-who">{p?.name} drew this card</div>
@@ -100,49 +100,62 @@ function CardReveal({ card, prompt, players }) {
 
 function AuctionPanel({ auction, prompt, players }) {
   const tile = TILES[auction.tileId];
+  const group = tile.group ? GROUPS[tile.group] : null;
   const leader = players.find((p) => p.id === auction.leaderId);
   const bidder = players.find((p) => p.id === auction.bidderId);
   const myBid = prompt?.type === 'bid' && game.isControllableByMe(prompt.pid) ? prompt : null;
   const me = myBid ? players.find((p) => p.id === myBid.pid) : null;
   const steps = myBid ? [1, 3, 6].map((k) => myBid.high + myBid.inc * k).filter((v, i) => i === 0 || v <= me.cash) : [];
   return (
-    <div className="auction">
+    <div className="auction" style={{ '--g': group?.color || '#ff9f1c' }}>
       <div className="auction-head">
         <span className="gavel">🔨</span>
-        <div>
+        <div className="auction-head-info">
           <div className="auction-kicker">Neelaami · Live Auction</div>
           <div className="auction-tile">{tile.name}</div>
+          <div className="auction-meta">
+            {group && <span className="auction-group-pill" style={{ background: group.color, color: group.text || '#fff' }}>{group.name}</span>}
+            <span>List Price: <b>{rupeesShort(tile.price)}</b></span>
+          </div>
         </div>
       </div>
       <div className="auction-bid">
-        <div className="auction-label">{auction.done ? (leader ? 'Sold for' : 'No bids') : 'Highest bid'}</div>
-        <div className="auction-amount" key={auction.high}>{auction.high ? rupees(auction.high) : '—'}</div>
+        <div className="auction-label">{auction.done ? (leader ? 'Sold for' : 'No bids') : 'Highest Bid'}</div>
+        <div className="auction-amount" key={auction.high}>{auction.high ? rupees(auction.high) : '₹0'}</div>
         <div className="auction-leader">
-          {leader ? <><PlayerAvatar player={leader} className="xs" /> {leader.name}</> : <span className="dim">List price {rupees(tile.price)}</span>}
+          {leader ? <><PlayerAvatar player={leader} className="xs" /> <b>{leader.name}</b> leads</> : <span className="dim">Opening bid starts at {rupeesShort(auction.inc)}</span>}
         </div>
       </div>
       <div className="auction-bidders">
-        {players.filter((p) => !p.bankrupt).map((p) => (
-          <span key={p.id} className={`ab ${auction.passed.includes(p.id) ? 'passed' : ''} ${p.id === auction.bidderId ? 'now' : ''} ${p.id === auction.leaderId ? 'lead' : ''}`}>
-            <PlayerAvatar player={p} className="xs" />
-          </span>
-        ))}
+        {players.filter((p) => !p.bankrupt).map((p) => {
+          const isPassed = auction.passed.includes(p.id);
+          const isNow = p.id === auction.bidderId;
+          const isLead = p.id === auction.leaderId;
+          return (
+            <span key={p.id} className={`ab ${isPassed ? 'passed' : ''} ${isNow ? 'now' : ''} ${isLead ? 'lead' : ''}`} style={{ '--pc': p.color }}>
+              <PlayerAvatar player={p} className="xs" />
+              <small className="ab-name">{p.name.split(' ')[0]}</small>
+            </span>
+          );
+        })}
       </div>
       {myBid ? (
         <div className="auction-actions">
-          <div className="auction-you">{me.name}, your bid · cash {rupeesShort(me.cash)}</div>
+          <div className="auction-you">
+            <b>{me.name}</b>, your turn to bid · Cash: <b>{rupeesShort(me.cash)}</b>
+          </div>
           <div className="auction-btns">
             {steps.map((v) => (
               <button key={v} className="btn btn-sm btn-green" disabled={v > me.cash} onClick={() => game.respond(v, myBid.id)}>
-                {rupeesShort(v)}
+                Bid {rupeesShort(v)}
               </button>
             ))}
-            <button className="btn btn-sm btn-red" onClick={() => game.respond('pass', myBid.id)}>Pass</button>
+            <button className="btn btn-sm btn-red" onClick={() => game.respond('pass', myBid.id)}>Pass ✕</button>
           </div>
         </div>
       ) : (
         <div className="auction-status">
-          {auction.done ? (leader ? `🎉 Sold to ${leader.name}!` : 'Nobody bid. It stays with the bank.') : bidder ? <>{bidder.name} is bidding<span className="dots" /></> : 'Going once…'}
+          {auction.done ? (leader ? `🎉 Sold to ${leader.name}!` : 'Nobody bid. It stays with the bank.') : bidder ? <>{bidder.name} is deciding<span className="dots" /></> : 'Going once…'}
         </div>
       )}
     </div>
@@ -172,11 +185,11 @@ function Dock({ s, onTrade, onOpenDeed }) {
     }
     if (prompt.type === 'jail') {
       return (
-        <div className="dock">
-          <TurnLabel player={pp} text={`In Tihar · attempt ${pp.jailTurns + 1} of 3`} />
+        <div className="dock dock-card dock-jail-card">
+          <TurnLabel player={pp} text={`In Tihar Jail · Attempt ${pp.jailTurns + 1} of 3`} />
           <div className="dock-row">
-            <button className="btn btn-sm btn-teal" onClick={() => respond('roll')}>🎲 Roll doubles</button>
-            <button className="btn btn-sm" disabled={pp.cash < JAIL_FINE} onClick={() => respond('pay')}>Pay {rupeesShort(JAIL_FINE)} bail</button>
+            <button className="btn btn-sm btn-teal" onClick={() => respond('roll')}>🎲 Roll Doubles</button>
+            <button className="btn btn-sm" disabled={pp.cash < JAIL_FINE} onClick={() => respond('pay')}>💰 Pay {rupeesShort(JAIL_FINE)} Bail</button>
             {pp.jailCards > 0 && <button className="btn btn-sm btn-pink" onClick={() => respond('card')}>📜 Use Bail Pass</button>}
           </div>
         </div>
@@ -186,18 +199,23 @@ function Dock({ s, onTrade, onOpenDeed }) {
       const tile = TILES[prompt.tileId];
       const afford = pp.cash >= tile.price;
       return (
-        <div className="dock dock-buy">
-          <div className="dock-ask" style={{ '--pc': pp.color }}>{pp.name}, buy this landmark?</div>
-          <button className="dock-deed" onClick={() => onOpenDeed(tile.id)} title="See full deed">
+        <div className="dock dock-card dock-buy">
+          <div className="dock-card-top">
+            <span className="dock-ask" style={{ '--pc': pp.color }}>{pp.name}, buy this landmark?</span>
+            <span className="dock-cash-pill">Wallet: <b>{rupeesShort(pp.cash)}</b></span>
+          </div>
+          <button className="dock-deed" onClick={() => onOpenDeed(tile.id)} title="Tap to inspect full title deed">
             <DeedCard tileId={tile.id} boomGroup={s.boomGroup} compact />
           </button>
           <div className="dock-row">
             <button className="btn btn-green" disabled={!afford} onClick={() => respond('buy')} autoFocus>
-              Buy · {rupeesShort(tile.price)}
+              🏷️ Buy · {rupeesShort(tile.price)}
             </button>
-            <button className="btn btn-plum" onClick={() => respond('auction')}>🔨 Auction</button>
+            <button className="btn btn-plum" onClick={() => respond('auction')}>
+              🔨 Auction
+            </button>
           </div>
-          {!afford && <div className="dock-hint">Not enough cash. Mortgage from Empire, or send to Auction.</div>}
+          {!afford && <div className="dock-hint warn">Not enough cash — mortgage from Empire or send to Auction.</div>}
         </div>
       );
     }
@@ -205,38 +223,26 @@ function Dock({ s, onTrade, onOpenDeed }) {
       const tile = TILES[prompt.tileId];
       const bName = BUILDINGS[prompt.nextLevel]?.name || 'Building';
       const newRent = tile.rent[prompt.nextLevel];
+      const groupColor = tile.group ? GROUPS[tile.group]?.color : '#1aa85a';
       return (
-        <div className="dock dock-buy">
-          <div className="dock-ask" style={{ '--pc': pp.color }}>🏗️ Landed on your {tile.short}! Upgrade it?</div>
-          <div className="dock-hint">
-            Build a <b>{bName}</b> right now — rent jumps to <b>{rupeesShort(newRent)}</b>!
+        <div className="dock dock-card dock-upgrade-card" style={{ '--g': groupColor }}>
+          <div className="dock-card-top">
+            <span className="dock-ask" style={{ '--pc': pp.color }}>🏗️ Spot Upgrade · {tile.short}</span>
+            <span className="dock-cash-pill">Wallet: <b>{rupeesShort(pp.cash)}</b></span>
+          </div>
+          <div className="dock-upgrade-body">
+            <div className="dock-upg-badge">Level {prompt.nextLevel} · {bName}</div>
+            <div className="dock-hint">
+              Upgrade <b>{tile.name}</b> right now — rent jumps to <b>{rupeesShort(newRent)}</b>!
+            </div>
           </div>
           <div className="dock-row">
             <button className="btn btn-green" onClick={() => respond('upgrade')} autoFocus>
               🏗️ Build {bName} · {rupeesShort(prompt.cost)}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => respond('pass')}>Skip</button>
-          </div>
-        </div>
-      );
-    }
-    if (prompt.type === 'takeover') {
-      const tile = TILES[prompt.tileId];
-      const owner = s.players.find((p) => p.id === prompt.ownerId);
-      return (
-        <div className="dock dock-buy dock-takeover">
-          <div className="dock-ask" style={{ '--pc': pp.color }}>
-            🏴‍☠️ {prompt.completesMine ? 'Complete Your Monopoly!' : 'Hostile Takeover Opportunity!'}
-          </div>
-          <div className="dock-hint">
-            Buy out <b>{tile.name}</b> from <b>{owner?.name}</b> for <b>{rupees(prompt.cost)}</b>!
-            {prompt.completesMine && ' (Unlocks full colour set & Havelis!)'}
-          </div>
-          <div className="dock-row">
-            <button className="btn btn-pink" onClick={() => respond('takeover')} autoFocus>
-              🏴‍☠️ Takeover · {rupeesShort(prompt.cost)}
+            <button className="btn btn-cream" onClick={() => respond('pass')}>
+              Skip ➜
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => respond('pass')}>Pass</button>
           </div>
         </div>
       );
@@ -256,15 +262,15 @@ function Dock({ s, onTrade, onOpenDeed }) {
       const canRaise = pp.cash + liquidationValue(s, pp.id) >= prompt.amount;
       const creditor = s.players.find((p) => p.id === prompt.creditor);
       return (
-        <div className="dock dock-debt">
-          <div className="debt-title">Udhaar! You owe {rupees(prompt.amount)}</div>
+        <div className="dock dock-card dock-debt">
+          <div className="debt-title">🚨 Udhaar! You owe {rupees(prompt.amount)}</div>
           <div className="dock-hint">
-            {prompt.reason}{creditor ? ` → ${creditor.name}` : ''}. You have {rupees(pp.cash)}. Sell buildings or mortgage from your Empire.
+            {prompt.reason}{creditor ? ` → ${creditor.name}` : ''}. You have <b>{rupees(pp.cash)}</b>. Sell buildings or mortgage from your Empire.
           </div>
           <div className="dock-row">
-            <button className="btn btn-sm btn-green" disabled={pp.cash < prompt.amount} onClick={() => respond('pay')}>Pay now</button>
-            <button className="btn btn-sm" disabled={!canRaise} onClick={() => respond('auto')}>Auto-raise cash</button>
-            <button className="btn btn-sm btn-red" onClick={() => respond('bankrupt')}>Go bankrupt</button>
+            <button className="btn btn-sm btn-green" disabled={pp.cash < prompt.amount} onClick={() => respond('pay')}>✅ Pay Now</button>
+            <button className="btn btn-sm" disabled={!canRaise} onClick={() => respond('auto')}>⚡ Auto-Raise</button>
+            <button className="btn btn-sm btn-red" onClick={() => respond('bankrupt')}>💀 Go Bankrupt</button>
           </div>
         </div>
       );
@@ -281,15 +287,13 @@ function Dock({ s, onTrade, onOpenDeed }) {
         ? 'Plotting next move'
         : prompt?.type === 'buy'
           ? `Inspecting ${TILES[prompt.tileId]?.short}`
-          : prompt?.type === 'takeover'
-            ? `Eyeing a takeover on ${TILES[prompt.tileId]?.short}`
-            : prompt?.type === 'upgrade'
-              ? `Upgrading ${TILES[prompt.tileId]?.short}`
-              : prompt?.type === 'end'
-                ? 'Managing Empire'
-                : prompt?.type === 'roll'
-                  ? 'Ready to roll'
-                  : '';
+          : prompt?.type === 'upgrade'
+            ? `Upgrading ${TILES[prompt.tileId]?.short}`
+            : prompt?.type === 'end'
+              ? 'Managing Empire'
+              : prompt?.type === 'roll'
+                ? 'Ready to roll'
+                : '';
 
   return (
     <div className="dock dock-watch">
@@ -330,6 +334,7 @@ function TurnLabel({ player, text }) {
 export default function BoardCenter({ s, onTrade, onOpenDeed }) {
   const max = s.config?.maxRounds;
   const canRoll = s.prompt?.type === 'roll' && game.isControllableByMe(s.prompt.pid);
+  const hideDiceForCard = s.prompt && game.isControllableByMe(s.prompt.pid) && ['buy', 'upgrade', 'debt'].includes(s.prompt.type);
   const boomGroup = s.boomGroup ? GROUPS[s.boomGroup] : null;
   const multTxt = s.bullRun ? '1.75×' : '1.5×';
 
@@ -348,21 +353,23 @@ export default function BoardCenter({ s, onTrade, onOpenDeed }) {
             </span>
           )}
           {s.bullRun && (
-            <span className="center-bull-pill" title="Sensex Bull Run: Hostile Takeovers unlocked!">
-              🐂 KABZA OPEN
+            <span className="center-bull-pill" title="Sensex Bull Run: Boom City rents surge 1.75×!">
+              🐂 BULL RUN 1.75×
             </span>
           )}
         </div>
       </div>
       <div className="center-mid">
-        <Dice
-          dice={s.dice}
-          rollId={s.rollId}
-          rolling={s.rolling}
-          double={s.lastDouble}
-          canRoll={canRoll}
-          onRoll={() => canRoll && game.respond('roll', s.prompt.id)}
-        />
+        {!hideDiceForCard && (
+          <Dice
+            dice={s.dice}
+            rollId={s.rollId}
+            rolling={s.rolling}
+            double={s.lastDouble}
+            canRoll={canRoll}
+            onRoll={() => canRoll && game.respond('roll', s.prompt.id)}
+          />
+        )}
         <Dock s={s} onTrade={onTrade} onOpenDeed={onOpenDeed} />
       </div>
       <div className="gullak-box" title="Jugaad Gullak: every tax and fine lands here. Land on Jugaad Junction to win it all!">

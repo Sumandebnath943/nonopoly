@@ -5,7 +5,7 @@ import { TILES, GROUPS, isOwnable } from '../data/board';
 import { botById } from '../data/characters';
 import { TileArt } from '../art/tileArt';
 import { PlayerAvatar } from '../art/characters';
-import { Logo, Rangoli } from '../art/decor';
+import { Rangoli } from '../art/decor';
 import { game } from '../game/engine';
 import * as R from '../game/rules';
 import { evaluateTrade } from '../game/ai';
@@ -45,34 +45,41 @@ export function DeedModal({ s, tileId, viewer, canManage, onClose }) {
           <p>{tile.desc}</p>
         </div>
       )}
-      {here.length > 0 && (
-        <div className="deed-here">
-          Standing here: {here.map((p) => <span key={p.id} className="here-chip" style={{ '--pc': p.color }}>{p.name}</span>)}
-        </div>
-      )}
-      {mine && (
-        <div className="deed-actions">
-          {tile.type === 'property' && !deed.mortgaged && (
-            <>
-              <button className="btn btn-sm btn-green" disabled={!can || !build.ok} onClick={() => game.build(viewer.id, tileId)} title={build.reason}>
-                + Build {rupeesShort(tile.houseCost)}
-              </button>
-              <button className="btn btn-sm" disabled={!can || !sell.ok} onClick={() => game.sellBuilding(viewer.id, tileId)} title={sell.reason}>
-                − Sell building
-              </button>
-            </>
+      {(here.length > 0 || mine) && (
+        <div className="deed-modal-tray">
+          {here.length > 0 && (
+            <div className="deed-here">
+              <span className="deed-here-label">On this tile:</span>
+              {here.map((p) => <span key={p.id} className="here-chip" style={{ '--pc': p.color }}>{p.name}</span>)}
+            </div>
           )}
-          {deed.mortgaged ? (
-            <button className="btn btn-sm btn-teal" disabled={!can || !unm.ok} onClick={() => game.unmortgage(viewer.id, tileId)} title={unm.reason}>
-              Redeem {rupeesShort(R.unmortgageCost(tileId))}
-            </button>
-          ) : (
-            <button className="btn btn-sm btn-red" disabled={!can || !mort.ok} onClick={() => game.mortgage(viewer.id, tileId)} title={mort.reason}>
-              Girvi +{rupeesShort(tile.mortgage)}
-            </button>
+          {mine && (
+            <div className="deed-actions">
+              <div className="deed-actions-row">
+                {tile.type === 'property' && !deed.mortgaged && (
+                  <>
+                    <button className="btn btn-sm btn-green" disabled={!can || !build.ok} onClick={() => game.build(viewer.id, tileId)} title={build.reason}>
+                      + Build {rupeesShort(tile.houseCost)}
+                    </button>
+                    <button className="btn btn-sm" disabled={!can || !sell.ok} onClick={() => game.sellBuilding(viewer.id, tileId)} title={sell.reason}>
+                      − Sell Building
+                    </button>
+                  </>
+                )}
+                {deed.mortgaged ? (
+                  <button className="btn btn-sm btn-teal" disabled={!can || !unm.ok} onClick={() => game.unmortgage(viewer.id, tileId)} title={unm.reason}>
+                    Redeem {rupeesShort(R.unmortgageCost(tileId))}
+                  </button>
+                ) : (
+                  <button className="btn btn-sm btn-red" disabled={!can || !mort.ok} onClick={() => game.mortgage(viewer.id, tileId)} title={mort.reason}>
+                    Girvi +{rupeesShort(tile.mortgage)}
+                  </button>
+                )}
+              </div>
+              {!canManage && <div className="deed-note">You can manage buildings and Girvi on your turn.</div>}
+              {canManage && !build.ok && build.reason && tile.type === 'property' && !deed.mortgaged && <div className="deed-note">{build.reason}</div>}
+            </div>
           )}
-          {!canManage && <div className="deed-note">Manage this on your turn.</div>}
-          {canManage && !build.ok && build.reason && tile.type === 'property' && !deed.mortgaged && <div className="deed-note">{build.reason}</div>}
         </div>
       )}
     </Modal>
@@ -81,7 +88,7 @@ export function DeedModal({ s, tileId, viewer, canManage, onClose }) {
 
 // ---------------- Trade ----------------
 function PropPick({ ids, picked, toggle, s }) {
-  if (!ids.length) return <div className="trade-empty">No properties</div>;
+  if (!ids.length) return <div className="trade-empty">No properties owned</div>;
   return (
     <div className="trade-props">
       {ids.map((id) => {
@@ -104,10 +111,12 @@ const CASH_STEP = 10000;
 function CashInput({ value, set, max }) {
   return (
     <div className="cash-input">
-      <button className="mini-btn" onClick={() => set(Math.max(0, value - CASH_STEP))} aria-label="Less cash">−</button>
-      <span>{rupees(value)}</span>
-      <button className="mini-btn" onClick={() => set(Math.min(max, value + CASH_STEP))} aria-label="More cash">+</button>
-      <button className="mini-btn" onClick={() => set(Math.min(max, value + CASH_STEP * 10))}>+1L</button>
+      <button className="mini-btn" disabled={value <= 0} onClick={() => set(Math.max(0, value - CASH_STEP * 10))} title="Subtract ₹1 Lakh">−1L</button>
+      <button className="mini-btn" disabled={value <= 0} onClick={() => set(Math.max(0, value - CASH_STEP))} aria-label="Less cash">−10K</button>
+      <span className="cash-input-val">{rupees(value)}</span>
+      <button className="mini-btn" disabled={value >= max} onClick={() => set(Math.min(max, value + CASH_STEP))} aria-label="More cash">+10K</button>
+      <button className="mini-btn" disabled={value >= max} onClick={() => set(Math.min(max, value + CASH_STEP * 10))} title="Add ₹1 Lakh">+1L</button>
+      {value > 0 && <button className="mini-btn cash-clear" onClick={() => set(0)} title="Reset cash to ₹0">✕</button>}
     </div>
   );
 }
@@ -158,7 +167,7 @@ export function TradeModal({ s, me, onClose }) {
         <span className="modal-emoji">🤝</span>
         <div>
           <div className="modal-kicker">Sauda Bazaar</div>
-          <h2>Make a deal</h2>
+          <h2>Make a Deal</h2>
         </div>
       </div>
       <div className="trade-partners">
@@ -172,13 +181,21 @@ export function TradeModal({ s, me, onClose }) {
       {partner && (
         <div className="trade-cols">
           <div className="trade-col" style={{ '--pc': me.color }}>
-            <div className="trade-col-head"><PlayerAvatar player={me} className="xs" /> You give</div>
+            <div className="trade-col-head">
+              <PlayerAvatar player={me} className="xs" />
+              <span>You give</span>
+              <span className="trade-col-cash">{rupeesShort(me.cash)}</span>
+            </div>
             <CashInput {...cashProps(trade.giveCash, setGiveCash, me.cash)} />
             <PropPick s={s} ids={R.ownedIds(s, me.id)} picked={giveIds} toggle={toggle(setGiveIds)} />
           </div>
           <div className="trade-swap">⇄</div>
           <div className="trade-col" style={{ '--pc': partner.color }}>
-            <div className="trade-col-head"><PlayerAvatar player={partner} className="xs" /> {partner.name} gives</div>
+            <div className="trade-col-head">
+              <PlayerAvatar player={partner} className="xs" />
+              <span>{partner.name} gives</span>
+              <span className="trade-col-cash">{rupeesShort(partner.cash)}</span>
+            </div>
             <CashInput {...cashProps(trade.getCash, setGetCash, partner.cash)} />
             <PropPick s={s} ids={R.ownedIds(s, partner.id)} picked={getIds} toggle={toggle(setGetIds)} />
           </div>
@@ -191,8 +208,8 @@ export function TradeModal({ s, me, onClose }) {
         </div>
       )}
       <div className="modal-foot">
-        <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-        <button className="btn btn-pink" disabled={empty || reply?.accept} onClick={propose}>Propose deal ➜</button>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-pink" disabled={empty || reply?.accept} onClick={propose}>Propose Deal ➜</button>
       </div>
     </Modal>
   );
@@ -253,7 +270,7 @@ export function IncomingTradeModal({ s }) {
         </div>
       ) : (
         <div className="modal-foot">
-          <button className="btn btn-ghost btn-sm" onClick={() => game.respondTrade(false)}>Cancel Offer</button>
+          <button className="btn btn-ghost" onClick={() => game.respondTrade(false)}>Cancel Offer</button>
         </div>
       )}
     </Modal>
@@ -307,15 +324,15 @@ const RULE_TABS = [
   },
   {
     id: 'power',
-    icon: '🏴‍☠️',
-    label: 'Power Moves',
-    intro: 'These rules stop the late game from going stale once every plot is bought.',
+    icon: '🎯',
+    label: 'Deals & Strategy',
+    intro: 'Master the Sauda Bazaar, auctions, and Boom City multipliers to dominate the board.',
     rules: [
-      ['🏴‍☠️', 'Hostile Takeover (Kabza)', 'After paying rent on a rival’s colour plot, you may force-buy it. The rival receives the full buyout price in cash.'],
-      ['🔓', 'When Kabza Unlocks', 'Always allowed if the plot would complete your own colour set. Otherwise it unlocks from Round 5, or once 4 or fewer tiles are unowned.'],
-      ['💰', 'Kabza Price', '1.8× the plot price if it completes your set, otherwise 2× the plot price. Plus the cost of any buildings on it. Rounded to ₹5,000.'],
-      ['🛡️', 'Fortress Protection', 'You cannot Kabza a plot if its owner holds the complete colour set, or if it has a Swanky Showroom or bigger (level 3+). Build up to defend your empire!'],
-      ['🎯', 'Monopoly Radar', 'The Empire panel shows every set where you are one plot away, plus who holds the missing piece. Trade for it, out-bid them, or Kabza it.'],
+      ['🎯', 'Monopoly Radar', 'The Empire panel highlights every colour set where you are one plot away from a full monopoly, plus who holds the missing piece so you can negotiate a trade.'],
+      ['🤝', 'Smart Bot Deals', 'Each AI rival has a distinct negotiation style. Offer fair cash or swap plots that help both sides, and watch out when a deal would hand a rival a full colour set.'],
+      ['🔨', 'Neelaami Bargains', 'Whenever a player passes on an unowned plot, it goes to live auction starting at half price. Keep cash reserves ready to snipe key plots at a discount.'],
+      ['🔥', 'Boom City & Bull Run', 'A random colour set gets a 1.5× rent boost each round—rising to 1.75× once the Sensex Bull Run begins. Prioritize building on sets with high foot traffic.'],
+      ['⚡', 'Spot Upgrade Advantage', 'Even before completing a colour set, landing on your own plot lets you build up to a Highway Dhaba (level 2), multiplying early-game kiraya.'],
     ],
   },
   {
@@ -397,6 +414,10 @@ export function RulesModal({ onClose }) {
 }
 
 // ---------------- Victory ----------------
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+const COLOR_GROUPS = ['brown', 'sky', 'pink', 'orange', 'red', 'yellow', 'green', 'blue'];
+const countMonopolies = (s, pid) => COLOR_GROUPS.filter((g) => R.ownsGroup(s, g, pid)).length;
+
 export function Victory({ s, onHome, onReplay }) {
   const winner = s.players.find((p) => p.id === s.winner);
   const ranking = useMemo(
@@ -420,38 +441,100 @@ export function Victory({ s, onHome, onReplay }) {
   if (!winner) return null;
   const line = winner.isAi ? botById(winner.botId).lines.collect : 'Sabse bada seth: the biggest tycoon at the table!';
   const winKicker = s.winReason === 'wealth'
-    ? 'Reached the Crorepati Net Worth Target!'
+    ? '💎 Crorepati Target Achieved'
     : s.winReason === 'rounds'
-      ? 'Richest Tycoon after the Final Round'
-      : 'Last Tycoon Standing';
+      ? `⏱️ Richest Tycoon After Round ${s.round}`
+      : `🏆 Last Tycoon Standing · Round ${s.round}`;
+
+  const winnerWorth = R.netWorth(s, winner.id);
+  const winnerDeeds = R.ownedIds(s, winner.id).length;
+  const winnerSets = countMonopolies(s, winner.id);
+  const winnerBuildings = Object.values(s.deeds).reduce(
+    (sum, d) => (d?.owner === winner.id ? sum + (d.level || 0) : sum),
+    0,
+  );
+
   return (
     <div className="victory">
-      <div className="victory-card">
+      <div className="victory-card" style={{ '--champ-c': winner.color }}>
         <Rangoli className="victory-rangoli" />
-        <div className="victory-kicker">{winKicker}</div>
-        <Logo size="md" />
-        <div className="victory-champ">
-          <span className="victory-crown">👑</span>
-          <PlayerAvatar player={winner} className="xl" />
+
+        <div className="victory-top">
+          <div className="victory-kicker">{winKicker}</div>
+          <div className="victory-sub-brand">NONOPOLY · GREAT INDIAN PROPERTY TAMASHA</div>
         </div>
-        <h2 className="victory-name">{winner.name}</h2>
-        <div className="victory-title">Nonopoly Champion</div>
-        <p className="victory-line">“{line}”</p>
-        <ol className="standings">
-          {ranking.map((p, i) => (
-            <li key={p.id} className={p.bankrupt ? 'out' : ''} style={{ '--pc': p.color }}>
-              <span className="rank">{i + 1}</span>
-              <PlayerAvatar player={p} className="xs" />
-              <span className="st-name">{p.name}</span>
-              <span className="st-worth">{p.bankrupt ? 'Diwaliya' : rupees(R.netWorth(s, p.id))}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="dock-row">
-          <button className="btn btn-lg" onClick={onReplay}>Play again</button>
-          <button className="btn btn-ghost" onClick={onHome}>Home</button>
+
+        <div className="victory-hero">
+          <div className="victory-champ">
+            <span className="victory-crown" aria-hidden="true">👑</span>
+            <PlayerAvatar player={winner} className="xl" />
+          </div>
+          <div className="victory-hero-info">
+            <div className="victory-title">Sabse Bada Seth · Champion</div>
+            <h2 className="victory-name">{winner.name}</h2>
+            <p className="victory-line">“{line}”</p>
+          </div>
+        </div>
+
+        <div className="victory-stats">
+          <div className="v-stat highlight">
+            <span>Net Worth</span>
+            <b>{rupees(winnerWorth)}</b>
+          </div>
+          <div className="v-stat">
+            <span>Cash in Hand</span>
+            <b>{rupeesShort(winner.cash)}</b>
+          </div>
+          <div className="v-stat">
+            <span>Deeds Owned</span>
+            <b>{winnerDeeds} {winnerDeeds === 1 ? 'Plot' : 'Plots'}</b>
+          </div>
+          <div className="v-stat">
+            <span>Empire</span>
+            <b>{winnerSets} {winnerSets === 1 ? 'Set' : 'Sets'} · {winnerBuildings} 🏗️</b>
+          </div>
+        </div>
+
+        <div className="standings-wrap">
+          <div className="standings-head">
+            <span>Final Standings</span>
+            <span>Net Worth</span>
+          </div>
+          <ol className="standings">
+            {ranking.map((p, i) => {
+              const deedsCount = R.ownedIds(s, p.id).length;
+              const setsCount = countMonopolies(s, p.id);
+              return (
+                <li key={p.id} className={`${p.bankrupt ? 'out' : ''} ${i === 0 ? 'first' : ''}`} style={{ '--pc': p.color }}>
+                  <span className={`rank ${i < 3 && !p.bankrupt ? `medal-${i + 1}` : ''}`}>
+                    {!p.bankrupt && i < 3 ? RANK_MEDALS[i] : `#${i + 1}`}
+                  </span>
+                  <PlayerAvatar player={p} className="xs" />
+                  <div className="st-info">
+                    <span className="st-name">{p.name}</span>
+                    <span className="st-meta">
+                      {p.bankrupt
+                        ? 'Eliminated'
+                        : `${deedsCount} ${deedsCount === 1 ? 'deed' : 'deeds'}${setsCount > 0 ? ` · ${setsCount} ★` : ''}`}
+                    </span>
+                  </div>
+                  {p.bankrupt ? (
+                    <span className="st-badge-out">DIWALIYA</span>
+                  ) : (
+                    <span className="st-worth">{rupees(R.netWorth(s, p.id))}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+
+        <div className="victory-actions">
+          <button className="btn btn-lg" onClick={onReplay}>🎲 Play Again</button>
+          <button className="btn btn-lg btn-ghost" onClick={onHome}>🏠 Back to Lobby</button>
         </div>
       </div>
     </div>
   );
 }
+

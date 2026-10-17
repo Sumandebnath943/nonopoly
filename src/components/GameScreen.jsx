@@ -316,8 +316,8 @@ export default function GameScreen({ onHome, onReplay }) {
                 : 'Your game is saved at the start of every turn. You can resume it from the home screen.'}
             </p>
             <div className="modal-foot">
-              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmQuit(false)}>Keep playing</button>
-              <button className="btn btn-red btn-sm" onClick={() => { setConfirmQuit(false); onHome(); }}>Leave to home</button>
+              <button className="btn btn-ghost" onClick={() => setConfirmQuit(false)}>Keep Playing</button>
+              <button className="btn btn-red" onClick={() => { setConfirmQuit(false); onHome(); }}>Leave to Home</button>
             </div>
           </div>
         </div>

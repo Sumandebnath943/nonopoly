@@ -252,7 +252,7 @@ class Game {
       else if (pr.type === 'bid') this.respond('pass', pr.id, true);
       else if (pr.type === 'jail') this.respond('roll', pr.id, true);
       else if (pr.type === 'debt') this.respond('auto', pr.id, true);
-      else if (pr.type === 'takeover' || pr.type === 'upgrade') this.respond('pass', pr.id, true);
+      else if (pr.type === 'upgrade') this.respond('pass', pr.id, true);
     }
   }
 
@@ -1006,31 +1006,6 @@ class Game {
       }
       await this.charge(pid, rent, owner.id, `Rent for ${tile.name}`);
     }
-
-    // Check if the player can launch a Hostile Takeover (Kabza Buyout) on this property!
-    const refreshedPlayer = this.player(pid);
-    if (!refreshedPlayer.bankrupt) {
-      const tk = R.canTakeover(this.state, pid, tile.id);
-      if (tk.ok) {
-        let doTakeover = false;
-        if (refreshedPlayer.isAi) {
-          await this.think(pid, 1000);
-          doTakeover = AI.decideTakeover(this.state, refreshedPlayer, tile.id);
-        } else {
-          const ans = await this.ask(pid, {
-            type: 'takeover',
-            tileId: tile.id,
-            cost: tk.cost,
-            ownerId: owner.id,
-            completesMine: tk.completesMine,
-          });
-          doTakeover = ans === 'takeover';
-        }
-        if (doTakeover) {
-          await this.executeTakeover(pid, tile.id, tk.cost, owner.id);
-        }
-      }
-    }
   }
 
   async spotUpgrade(pid, id) {
@@ -1055,35 +1030,6 @@ class Game {
     } else {
       this.toast({ kind: 'haveli', title: `Upgraded to ${bName}!`, sub: tile.name, tone: 'gain', pid });
       await this.wait(750);
-    }
-  }
-
-  async executeTakeover(pid, id, cost, prevOwnerId) {
-    const tile = TILES[id];
-    const p = this.player(pid);
-    const prevOwner = this.player(prevOwnerId);
-    if (!p || !prevOwner || p.cash < cost) return;
-    this.addCash(pid, -cost);
-    this.addCash(prevOwnerId, cost);
-    this.updateDeed(id, { owner: pid, mortgaged: false });
-    this.sfx('dhol');
-    if (p.isAi) {
-      const line = AI.generateBotTrashTalk(this.state, p, 'takeover', { victim: prevOwner, tile, cost });
-      this.say(pid, line, 3800, true);
-    }
-    this.log(`🏴‍☠️ **HOSTILE TAKEOVER!** **${p.name}** bought out **${tile.name}** from **${prevOwner.name}** for ${rupees(cost)}!`, { pid, tone: 'big' });
-    this.headline(`KABZA ALERT: ${p.name} executes a ${rupees(cost)} Hostile Takeover of ${tile.name} from ${prevOwner.name}!`);
-    await this.moment({ kind: 'takeover', pid, to: prevOwnerId, tileId: id, amount: cost }, 2600);
-
-    const g = tile.group;
-    if (g && R.ownsGroup(this.state, g, pid)) {
-      this.sfx('victory');
-      if (p.isAi) {
-        const line = AI.generateBotTrashTalk(this.state, p, 'monopoly', { group: g });
-        this.say(pid, line, 3600, true);
-      }
-      this.log(`👑 **${p.name}** now controls the entire **${GROUPS[g].name}** monopoly!`, { pid, tone: 'big' });
-      await this.moment({ kind: 'monopoly', pid, group: g }, 2600);
     }
   }
 
@@ -1465,7 +1411,7 @@ class Game {
     const s = this.state;
     const pr = s.prompt;
     if (!this.isControllableByMe(pid)) return false;
-    return s.status === 'playing' && !!pr && pr.pid === pid && ['roll', 'end', 'jail', 'debt', 'upgrade', 'takeover'].includes(pr.type);
+    return s.status === 'playing' && !!pr && pr.pid === pid && ['roll', 'end', 'jail', 'debt', 'upgrade'].includes(pr.type);
   }
 
   async build(pid, id, fromRemote = false, awaitMoment = false) {
