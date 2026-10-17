@@ -20,7 +20,9 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 function setContext(state, pid, tile) {
   const g = groupKey(tile);
-  if (!g) return { completes: false, blocks: false, blockedPlayer: null, size: 1 };
+  if (!g || tile.type !== 'property') {
+    return { completes: false, blocks: false, blockedPlayer: null, size: 1, mine: 0 };
+  }
   const size = GROUPS[g].ids.length;
   const mine = countOwnedInGroup(state, g, pid);
   const completes = mine === size - 1;
@@ -42,17 +44,20 @@ export function decideBuy(state, player, tileId) {
   }
   const { completes, blocks, blockedPlayer } = setContext(state, player.id, tile);
   let buffer = bot.buffer;
-  if (completes || blocks) buffer *= 0.25;
-  if (bot.likes.includes(groupKey(tile))) buffer *= 0.65;
+  if (completes) buffer *= 0.45;
+  else if (bot.likes.includes(groupKey(tile))) buffer *= 0.85;
   const after = player.cash - tile.price;
-  const shouldBuy = completes || after >= buffer || (after > 25000 && Math.random() < bot.risk);
+  const shouldBuy =
+    (completes && after >= 60000) ||
+    after >= buffer ||
+    (after >= buffer * 0.65 && Math.random() < bot.risk * 0.6);
 
   if (shouldBuy) {
     if (blocks && blockedPlayer) {
       const gName = tile.group ? GROUPS[tile.group]?.name : tile.short;
       const blockLines = {
         gupta: `Arre ${blockedPlayer.name} ji, ${gName} poora karne ka irada tha kya? Ab ${tile.short} Gupta Ji ke naam!`,
-        bunty: `Sorry ${blockedPlayer.name} bro, just cockblocked your ${gName} monopoly! Strategic moat!`,
+        bunty: `Sorry ${blockedPlayer.name} bro, just blocked your ${gName} monopoly! Strategic moat!`,
         tauji: `Kyun ${blockedPlayer.name}, ${gName} pe kabza karne ka sapna tha? ${tile.short} pe Tauji ka khunta gad gaya!`,
         aunty: `Haye ${blockedPlayer.name} beta, bura mat maanna—${tile.short} toh Pammi Aunty hi lengi!`,
         chintu: `Prank ho gaya ${blockedPlayer.name} ke saath! Snatched ${tile.short} right before their monopoly! 😂`,
@@ -69,15 +74,14 @@ export function decideBid(state, player, tileId, high, increment) {
   const bot = botById(player.botId);
   const tile = TILES[tileId];
   const next = high + increment;
-  const { completes, blocks } = setContext(state, player.id, tile);
+  const { completes } = setContext(state, player.id, tile);
   let mult = bot.auctionMax;
-  if (completes) mult += 0.65;
-  else if (blocks) mult += 0.35;
-  if (bot.likes.includes(groupKey(tile))) mult += 0.12;
-  const ceiling = Math.min(player.cash - Math.min(bot.buffer, 50000), Math.floor(tile.price * mult));
+  if (completes) mult += 0.18;
+  else if (bot.likes.includes(groupKey(tile))) mult += 0.06;
+  const reserve = completes ? Math.min(bot.buffer * 0.5, 100000) : bot.buffer * 0.85;
+  const ceiling = Math.min(player.cash - reserve, Math.floor(tile.price * mult));
   if (next > ceiling) return null;
-  const jump = high > 0 && Math.random() < bot.risk * 0.4 ? increment * 3 : 0;
-  return Math.min(ceiling, next + jump);
+  return next;
 }
 
 export function decideJail(state, player) {
@@ -85,7 +89,7 @@ export function decideJail(state, player) {
   if (player.jailCards > 0) return 'card';
   const ownedCount = state.deeds.filter((d) => d && d.owner).length;
   const lateGame = ownedCount > 22;
-  if (player.cash >= JAIL_FINE + bot.buffer * 0.5 && !lateGame) return 'pay';
+  if (player.cash >= JAIL_FINE + bot.buffer && !lateGame) return 'pay';
   return 'roll';
 }
 
@@ -93,18 +97,20 @@ export function decideSpotUpgrade(state, player, tileId) {
   const chk = canSpotUpgrade(state, player.id, tileId);
   if (!chk.ok) return false;
   const bot = botById(player.botId);
-  const reserve = Math.max(50000, bot.buffer * 0.5);
+  const reserve = Math.max(160000, bot.buffer * 0.9);
   return player.cash - chk.cost >= reserve;
 }
 
-// Plan building upgrades (even-build rule respected by re-checking after each step).
+// Plan building upgrades (capped at 2 upgrades per turn so bots don't instant-max a set in 1 turn).
+const MAX_BOT_BUILDS_PER_TURN = 2;
+
 export function planBuilds(state, player) {
   const bot = botById(player.botId);
-  const reserve = Math.max(55000, bot.buffer * 0.55);
+  const reserve = Math.max(180000, bot.buffer);
   const plans = [];
   let sim = state;
   let guard = 0;
-  while (guard++ < 30) {
+  while (guard++ < 12 && plans.length < MAX_BOT_BUILDS_PER_TURN) {
     const me = sim.players.find((p) => p.id === player.id);
     const options = ownedIds(sim, player.id)
       .filter((id) => canBuild(sim, player.id, id).ok && me.cash - TILES[id].houseCost >= reserve)
@@ -128,8 +134,7 @@ export function planUnmortgage(state, player) {
     .filter((id) => player.cash - unmortgageCost(id) > bot.buffer * 1.4);
 }
 
-// Proactive AI trade generator: Finds a trade that completes a colour group for `botPlayer`
-// (either swapping a single property that helps the partner, or offering a generous cash buyout).
+// Proactive AI trade generator: Finds a mutually beneficial swap (prioritizing human players).
 export function findBestTrade(state, botPlayer) {
   const bot = botById(botPlayer.botId);
   const myTradeable = ownedIds(state, botPlayer.id).filter((id) => isTradeable(state, id));
@@ -138,7 +143,6 @@ export function findBestTrade(state, botPlayer) {
   for (const g of colorGroups) {
     const ids = GROUPS[g].ids;
     const mine = ids.filter((id) => state.deeds[id]?.owner === botPlayer.id);
-    // We need all but 1 in this group!
     if (mine.length !== ids.length - 1) continue;
     const missingId = ids.find((id) => state.deeds[id]?.owner && state.deeds[id]?.owner !== botPlayer.id);
     if (missingId === undefined || !isTradeable(state, missingId)) continue;
@@ -149,21 +153,26 @@ export function findBestTrade(state, botPlayer) {
 
     const missingTile = TILES[missingId];
 
-    // Option 1: Do we hold a single property in another group where `targetOwner` already holds pieces?
+    // Look for a single property we hold in another group where `targetOwner` already holds pieces.
+    // If trading with another bot, require that the swap also completes `targetOwner`'s set (no lopsided bot collusion).
     const swapCandidate = myTradeable.find((myId) => {
       const myTile = TILES[myId];
       if (!myTile.group || myTile.group === g) return false;
       const myCountThere = countOwnedInGroup(state, myTile.group, botPlayer.id);
       const theirCountThere = countOwnedInGroup(state, myTile.group, targetOwnerId);
+      const groupSize = GROUPS[myTile.group]?.ids.length || 3;
+      if (targetOwner.isAi) {
+        return myCountThere === 1 && theirCountThere === groupSize - 1;
+      }
       return myCountThere === 1 && theirCountThere >= 1;
     });
 
     if (swapCandidate !== undefined) {
       const giveTile = TILES[swapCandidate];
       const diff = missingTile.price - giveTile.price;
-      const giveCash = diff > 0 ? Math.min(Math.max(20000, diff + 30000), Math.floor(botPlayer.cash * 0.45)) : 0;
-      const getCash = diff < -40000 ? Math.min(Math.abs(diff), Math.floor(targetOwner.cash * 0.35)) : 0;
-      if (botPlayer.cash - giveCash >= 60000) {
+      const giveCash = diff > 0 ? Math.min(Math.max(20000, diff + 20000), Math.floor(botPlayer.cash * 0.35)) : 0;
+      const getCash = !targetOwner.isAi ? 0 : (diff < -40000 ? Math.min(Math.abs(diff), Math.floor(targetOwner.cash * 0.25)) : 0);
+      if (botPlayer.cash - giveCash >= bot.buffer) {
         return {
           fromId: botPlayer.id,
           toId: targetOwnerId,
@@ -175,17 +184,19 @@ export function findBestTrade(state, botPlayer) {
       }
     }
 
-    // Option 2: Cash buyout offer for the missing piece if the bot has plenty of cash
-    const offerPrice = Math.round((missingTile.price * (1.45 + bot.risk * 0.25)) / 10000) * 10000;
-    if (botPlayer.cash - offerPrice >= Math.max(100000, bot.buffer)) {
-      return {
-        fromId: botPlayer.id,
-        toId: targetOwnerId,
-        giveIds: [],
-        getIds: [missingId],
-        giveCash: offerPrice,
-        getCash: 0,
-      };
+    // Cash buyout offer ONLY to human players (never bot-to-bot cash buyouts that hand a bot a free monopoly)
+    if (!targetOwner.isAi) {
+      const offerPrice = Math.round((missingTile.price * 1.35) / 10000) * 10000;
+      if (botPlayer.cash - offerPrice >= bot.buffer) {
+        return {
+          fromId: botPlayer.id,
+          toId: targetOwnerId,
+          giveIds: [],
+          getIds: [missingId],
+          giveCash: offerPrice,
+          getCash: 0,
+        };
+      }
     }
   }
   return null;
@@ -193,38 +204,63 @@ export function findBestTrade(state, botPlayer) {
 
 export function evaluateTrade(state, botPlayer, trade) {
   const bot = botById(botPlayer.botId);
+  const proposer = state.players.find((p) => p.id === trade.fromId);
   const { giveCash = 0, giveIds = [], getCash = 0, getIds = [] } = trade; // from the proposer's view
   if (getCash > botPlayer.cash) return { accept: false, line: 'Itna cash abhi haath mein nahi hai!' };
   if ([...giveIds, ...getIds].some((id) => !isTradeable(state, id))) {
     return { accept: false, line: 'Pehle buildings becho, phir sauda karenge.' };
   }
 
-  const valueOf = (id, receiverId) => {
+  // Value of a tile to the bot receiving it
+  const valueToBot = (id) => {
     const tile = TILES[id];
-    let v = state.deeds[id].mortgaged ? tile.price * 0.6 : tile.price;
-    if (tile.group) {
+    let v = state.deeds[id].mortgaged ? tile.price * 0.65 : tile.price;
+    if (tile.group && tile.type === 'property') {
       const size = GROUPS[tile.group].ids.length;
-      const have = countOwnedInGroup(state, tile.group, receiverId);
-      if (have === size - 1) v *= 2.15; // completes a set
-      else if (have > 0) v *= 1.25;
+      const have = countOwnedInGroup(state, tile.group, botPlayer.id);
+      if (have === size - 1) v *= 1.5; // completes bot's set!
+      else if (have > 0) v *= 1.2;
+    } else if (tile.group && countOwnedInGroup(state, tile.group, botPlayer.id) > 0) {
+      v *= 1.15;
+    }
+    return v;
+  };
+
+  // Value of a tile the bot is being asked to give up
+  const costToBot = (id) => {
+    const tile = TILES[id];
+    let v = state.deeds[id].mortgaged ? tile.price * 0.65 : tile.price;
+    if (tile.group && tile.type === 'property') {
+      const size = GROUPS[tile.group].ids.length;
+      const botHave = countOwnedInGroup(state, tile.group, botPlayer.id);
+      const proposerHave = countOwnedInGroup(state, tile.group, trade.fromId);
+      if (botHave === size) v *= 1.5; // bot already owns the full set
+      else if (botHave === size - 1) v *= 1.3; // bot is 1 away from this set too
+      else if (botHave > 1) v *= 1.12;
+      // Modest premium if it completes proposer's set (much fairer for humans; stricter for rival bots)
+      if (proposerHave === size - 1) {
+        v *= proposer?.isAi ? 1.65 : 1.15;
+      }
     }
     return v;
   };
 
   let botGets = giveCash;
-  giveIds.forEach((id) => { botGets += valueOf(id, botPlayer.id); });
+  giveIds.forEach((id) => { botGets += valueToBot(id); });
   let botGives = getCash;
-  getIds.forEach((id) => {
-    const tile = TILES[id];
-    let v = valueOf(id, trade.fromId);
-    if (tile.group && countOwnedInGroup(state, tile.group, botPlayer.id) === GROUPS[tile.group].ids.length) v *= 1.75;
-    botGives += v;
-  });
+  getIds.forEach((id) => { botGives += costToBot(id); });
 
-  const margin = 1.1 - bot.risk * 0.22;
-  if (botGets >= botGives * margin) return { accept: true, line: 'Sauda pakka! Haath milao!' };
-  if (botGets >= botGives * 0.85) return { accept: false, line: 'Thoda aur meetha karo deal ko, tab baat banegi.' };
-  return { accept: false, line: 'Mazaak kar rahe ho kya? Yeh deal bilkul घाटे ka sauda hai!' };
+  const margin = proposer?.isAi ? 1.08 : (0.95 - bot.risk * 0.1);
+  const required = botGives * margin;
+  if (botGets >= required) return { accept: true, line: 'Sauda pakka! Haath milao!' };
+  const shortfall = Math.ceil((required - botGets) / 10000) * 10000;
+  if (botGets >= required * 0.78) {
+    return {
+      accept: false,
+      line: `Thoda aur meetha karo deal ko—करीब ${rupeesShort(Math.max(10000, shortfall))} aur mila do toh baat banegi!`,
+    };
+  }
+  return { accept: false, line: 'Yeh deal thoda घाटे ka sauda lag raha hai—offer badhao!' };
 }
 
 // ============================================================================

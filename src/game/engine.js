@@ -24,10 +24,25 @@ export const QUICK_REACTIONS = PREWRITTEN_TRASH_TALKS;
 
 const BOOM_GROUPS = ['brown', 'sky', 'pink', 'orange', 'red', 'yellow', 'green', 'blue'];
 
+const fairInt = (max) => {
+  if (max <= 1) return 0;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / max) * max;
+    let val;
+    do {
+      crypto.getRandomValues(buf);
+      val = buf[0];
+    } while (val >= limit);
+    return val % max;
+  }
+  return Math.floor(Math.random() * max);
+};
+
 const shuffle = (arr) => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = fairInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -93,6 +108,7 @@ class Game {
     this.seq = 0;
     this.pending = null;
     this.momentResolver = null;
+    this.tradeResolver = null;
     this.timers = new Set();
     this.chatOpen = false;
     this.lastBotTradeRound = 0;
@@ -550,6 +566,11 @@ class Game {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
     this.momentResolver = null;
+    if (this.tradeResolver) {
+      const r = this.tradeResolver;
+      this.tradeResolver = null;
+      r(false);
+    }
     if (this.pending) {
       const p = this.pending;
       this.pending = null;
@@ -582,16 +603,28 @@ class Game {
     }));
     const deeds = blankDeeds();
     if (config.mode === 'express') {
-      const pool = shuffle(TILES.filter((t) => t.type === 'property').map((t) => t.id));
+      const tiers = [
+        shuffle(TILES.filter((t) => t.type === 'property' && ['brown', 'sky', 'pink'].includes(t.group)).map((t) => t.id)),
+        shuffle(TILES.filter((t) => t.type === 'property' && ['orange', 'red'].includes(t.group)).map((t) => t.id)),
+        shuffle(TILES.filter((t) => t.type === 'property' && ['yellow', 'green'].includes(t.group)).map((t) => t.id)),
+      ];
       const plotsPerPlayer = players.length <= 3 ? 3 : 2;
-      players.forEach((p, i) => {
-        for (let k = 0; k < plotsPerPlayer; k++) {
-          const id = pool[i * plotsPerPlayer + k];
-          if (id !== undefined) deeds[id] = { ...deeds[id], owner: p.id };
-        }
-      });
+      const usedGroupsByPlayer = players.map(() => new Set());
+      for (let k = 0; k < plotsPerPlayer; k++) {
+        const pool = tiers[k] || tiers[0];
+        players.forEach((p, idx) => {
+          const usedGroups = usedGroupsByPlayer[idx];
+          let pickIdx = pool.findIndex((id) => !usedGroups.has(TILES[id].group));
+          if (pickIdx === -1) pickIdx = 0;
+          if (pickIdx !== -1 && pool.length > 0) {
+            const [id] = pool.splice(pickIdx, 1);
+            usedGroups.add(TILES[id].group);
+            deeds[id] = { ...deeds[id], owner: p.id };
+          }
+        });
+      }
     }
-    const firstBoom = BOOM_GROUPS[Math.floor(Math.random() * BOOM_GROUPS.length)];
+    const firstBoom = BOOM_GROUPS[fairInt(BOOM_GROUPS.length)];
     this.state = {
       ...blankState(this.state.settings),
       status: 'playing',
@@ -728,7 +761,7 @@ class Game {
       i = (i + 1) % players.length;
       if (i === 0) {
         round++;
-        boomGroup = BOOM_GROUPS[Math.floor(Math.random() * BOOM_GROUPS.length)];
+        boomGroup = BOOM_GROUPS[fairInt(BOOM_GROUPS.length)];
       }
     } while (players[i].bankrupt);
 
@@ -837,8 +870,8 @@ class Game {
   }
 
   async roll(pid) {
-    const a = 1 + Math.floor(Math.random() * 6);
-    const b = 1 + Math.floor(Math.random() * 6);
+    const a = 1 + fairInt(6);
+    const b = 1 + fairInt(6);
     this.sfx('dice');
     this.set((s) => ({ rolling: true, rollId: s.rollId + 1, dice: [a, b], lastDouble: a === b, landed: null }));
     await this.wait(940);
@@ -1115,7 +1148,8 @@ class Game {
       if (action === 'pass') {
         passed.add(bidderId);
       } else {
-        high = Math.max(min, Math.min(Number(action) || min, b.cash));
+        const currentCash = this.player(bidderId).cash;
+        high = Math.max(min, Math.min(Number(action) || min, currentCash));
         leader = bidderId;
         this.sfx('bid');
         if (b.isAi && Math.random() < 0.35) this.say(bidderId, botById(b.botId).lines.bid, 2200);
@@ -1373,8 +1407,8 @@ class Game {
       // 1. Unmortgage deeds if flush with cash
       AI.planUnmortgage(this.state, p).forEach((id) => this.unmortgage(pid, id, true));
 
-      // 2. Proactively look for a smart trade to complete a Monopoly!
-      if (this.state.round > this.lastBotTradeRound) {
+      // 2. Proactively look for a smart trade to complete a Monopoly (paced fairly, not every round)
+      if (this.state.round >= 4 && this.state.round >= this.lastBotTradeRound + 2 && Math.random() < 0.45) {
         const trade = AI.findBestTrade(this.state, this.player(pid));
         if (trade) {
           this.lastBotTradeRound = this.state.round;
@@ -1387,10 +1421,13 @@ class Game {
               await this.executeTrade(trade, true);
             }
           } else if (partner && !partner.bankrupt) {
-            // Propose trade to human player and wait briefly or let them respond
+            // Propose trade to human player and wait for their response before ending turn
             this.say(pid, `${partner.name}, ek shandaar deal hai tumhare liye!`, 3200);
             this.proposeTrade(trade, true);
-            await this.wait(1200);
+            await new Promise((resolve) => {
+              this.tradeResolver = resolve;
+            });
+            await this.wait(500);
           }
         }
       }
@@ -1411,7 +1448,12 @@ class Game {
     const s = this.state;
     const pr = s.prompt;
     if (!this.isControllableByMe(pid)) return false;
-    return s.status === 'playing' && !!pr && pr.pid === pid && ['roll', 'end', 'jail', 'debt', 'upgrade'].includes(pr.type);
+    return (
+      s.status === 'playing'
+      && !!pr
+      && pr.pid === pid
+      && ['roll', 'buy', 'bid', 'end', 'jail', 'debt', 'upgrade'].includes(pr.type)
+    );
   }
 
   async build(pid, id, fromRemote = false, awaitMoment = false) {
@@ -1528,6 +1570,11 @@ class Game {
       this.sfx('tension');
       if (partner) this.say(partner.id, 'Sauda cancel! Not interested.', 2600);
       this.toast({ kind: 'trade', title: 'Deal Rejected', sub: `${partner?.name || 'Player'} declined the offer`, tone: 'loss' });
+    }
+    if (this.tradeResolver) {
+      const r = this.tradeResolver;
+      this.tradeResolver = null;
+      r(accept);
     }
   }
 
